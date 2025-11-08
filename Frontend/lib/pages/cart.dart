@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'checkout.dart'; // make sure this path is correct
+import 'package:fruit_shop/services/user_data_api.dart';
 
 class CartPage extends StatefulWidget {
   final List<Map<String, dynamic>> cartItems;
@@ -13,6 +14,41 @@ class CartPage extends StatefulWidget {
 class _CartPageState extends State<CartPage> {
   final Map<String, int> quantities = {};
   late List<Map<String, dynamic>> items;
+  DateTime _lastChange = DateTime.now();
+  bool _syncScheduled = false;
+
+  void _scheduleSync() {
+    _lastChange = DateTime.now();
+    if (_syncScheduled) return;
+    _syncScheduled = true;
+    Future.delayed(const Duration(milliseconds: 800), () async {
+      // debounce window
+      if (DateTime.now().difference(_lastChange).inMilliseconds < 700) {
+        _syncScheduled = false;
+        _scheduleSync();
+        return;
+      }
+      _syncScheduled = false;
+      final payload = items.map((item) {
+        final id = item['cartId'] as String;
+        return {
+          'name': item['name'],
+          'image': item['image'],
+          'price': item['price'],
+          'measure':
+              (item['measure'] as num?)?.toDouble() ??
+              (item['weightKg'] as num?)?.toDouble() ??
+              1.0,
+          'unit': item['unit'] ?? 'kg',
+          'quantity': (quantities[id] ?? (item['quantity'] as num? ?? 1))
+              .toInt(),
+        };
+      }).toList();
+      try {
+        await UserDataApi.setCart(payload);
+      } catch (_) {}
+    });
+  }
 
   @override
   void initState() {
@@ -24,7 +60,8 @@ class _CartPageState extends State<CartPage> {
     }
     for (var item in items) {
       final id = item['cartId'] as String;
-      quantities[id] = (quantities[id] ?? 1);
+      final initialQty = (item['quantity'] as num?)?.toInt() ?? 1;
+      quantities[id] = initialQty;
     }
   }
 
@@ -102,6 +139,7 @@ class _CartPageState extends State<CartPage> {
                             items.removeAt(index);
                             quantities.remove(id);
                           });
+                          _scheduleSync();
                         },
                         child: Card(
                           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -145,6 +183,7 @@ class _CartPageState extends State<CartPage> {
                                         quantities[id] = qty - 1;
                                       }
                                     });
+                                    _scheduleSync();
                                   },
                                 ),
                                 Text(
@@ -165,6 +204,7 @@ class _CartPageState extends State<CartPage> {
                                     setState(() {
                                       quantities[id] = qty + 1;
                                     });
+                                    _scheduleSync();
                                   },
                                 ),
                               ],

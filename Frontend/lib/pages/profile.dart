@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fruit_shop/services/auth_service.dart';
+import 'package:fruit_shop/services/user_data_api.dart';
 import 'package:fruit_shop/pages/cart.dart';
-import 'package:fruit_shop/services/favorites_storage.dart';
 import 'package:fruit_shop/widgets/app_snackbar.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -30,6 +30,9 @@ class _ProfilePageState extends State<ProfilePage>
   bool _marketingEnabled = false;
   final ImagePicker _picker = ImagePicker();
   File? _avatarFile;
+  // Recent orders from backend
+  List<Map<String, dynamic>> _recentOrders = const [];
+  bool _loadingRecent = false;
 
   @override
   void initState() {
@@ -61,8 +64,70 @@ class _ProfilePageState extends State<ProfilePage>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
-    // Load persisted favorites to reflect changes made on Home
-    _loadFavoritesCount();
+    _refreshFromBackend();
+    _refreshRecentOrders();
+  }
+
+  Future<void> _refreshFromBackend() async {
+    try {
+      final me = await UserDataApi.getMe();
+      if (!mounted) return;
+      if (me != null) {
+        _nameController.text = me['name']?.toString() ?? _nameController.text;
+        _emailController.text =
+            me['email']?.toString() ?? _emailController.text;
+        final addr = (me['address'] as Map?)?.cast<String, dynamic>();
+        if (addr != null) {
+          _addressController.text = [
+            addr['address'],
+            addr['landmark'],
+            addr['city'],
+            addr['state'],
+            addr['pincode'],
+          ].where((e) => (e ?? '').toString().isNotEmpty).join(', ');
+          // Prefer top-level phone; fall back to address.phone if missing
+          final phone = (me['phone']?.toString() ?? '').trim();
+          _phoneController.text = phone.isNotEmpty
+              ? phone
+              : (addr['phone']?.toString() ?? _phoneController.text);
+        } else {
+          // No address object; still try to set phone from top-level
+          final phone = (me['phone']?.toString() ?? '').trim();
+          if (phone.isNotEmpty) {
+            _phoneController.text = phone;
+          }
+        }
+        final favs = (me['favorites'] as List?) ?? const [];
+        _favorites = favs.length;
+        setState(() {});
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _refreshRecentOrders() async {
+    setState(() => _loadingRecent = true);
+    try {
+      final orders = await UserDataApi.fetchOrders();
+      // Sort by createdAt desc if present
+      orders.sort((a, b) {
+        final ad =
+            DateTime.tryParse(
+              (a['createdAt'] ?? '').toString(),
+            )?.millisecondsSinceEpoch ??
+            0;
+        final bd =
+            DateTime.tryParse(
+              (b['createdAt'] ?? '').toString(),
+            )?.millisecondsSinceEpoch ??
+            0;
+        return bd.compareTo(ad);
+      });
+      setState(() => _recentOrders = orders.take(3).toList());
+    } catch (_) {
+      // ignore errors quietly in profile; user can check Orders tab
+    } finally {
+      if (mounted) setState(() => _loadingRecent = false);
+    }
   }
 
   @override
@@ -82,17 +147,29 @@ class _ProfilePageState extends State<ProfilePage>
     }
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
     setState(() => _isEditing = false);
-    // In a real app: send updates to backend / persist locally
-    AppSnack.showSuccess(context, 'Profile updated');
+    try {
+      final ok = await UserDataApi.updateProfile(
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+      );
+      if (!mounted) return;
+      if (ok) {
+        AppSnack.showSuccess(context, 'Profile updated');
+        _refreshFromBackend();
+      } else {
+        AppSnack.showError(context, 'Failed to update profile');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppSnack.showError(context, 'Update failed: $e');
+    }
   }
 
-  Future<void> _loadFavoritesCount() async {
-    final favs = await FavoritesStorage.load();
-    if (!mounted) return;
-    setState(() => _favorites = favs.length);
-  }
+  // Removed legacy favorites loader (backend hydration covers this)
 
   void _confirmLogout() {
     showDialog<void>(
@@ -396,42 +473,18 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildRecentOrders() {
-    // Sample recent orders; in a real app this comes from backend
-    final orders = [
-      {
-        'id': 'VF-10234',
-        'date': 'Oct 12, 2025',
-        'status': 'Delivered',
-        'total': 589.0,
-        'thumbs': [
-          'assets/images/cherry.avif',
-          'assets/images/Pomegranate.avif',
-        ],
-      },
-      {
-        'id': 'VF-10188',
-        'date': 'Sep 28, 2025',
-        'status': 'Out for delivery',
-        'total': 349.0,
-        'thumbs': ['assets/images/Pomegranate.avif'],
-      },
-    ];
-
-    Color statusColor(String s) {
-      switch (s.toLowerCase()) {
-        case 'delivered':
-          return Colors.green;
-        case 'out for delivery':
-          return Colors.orange;
-        case 'cancelled':
-          return Colors.red;
-        default:
-          return Colors.blueGrey;
-      }
-    }
-
     Widget orderCard(Map<String, dynamic> o, int idx) {
-      final color = statusColor(o['status'] as String);
+      final createdAt = DateTime.tryParse((o['createdAt'] ?? '').toString());
+      final pricing = (o['pricing'] as Map?)?.cast<String, dynamic>() ?? {};
+      final total = (pricing['total'] as num?)?.toDouble() ?? 0.0;
+      final items = (o['items'] as List?)?.cast<Map>() ?? const [];
+      final thumbs = items
+          .map((e) => (e['image']?.toString()))
+          .whereType<String>()
+          .toList();
+      final payment = (o['payment'] as Map?)?.cast<String, dynamic>() ?? {};
+      final status = (payment['status']?.toString() ?? 'pending');
+      final color = _statusColor(status);
       return TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: 1),
         duration: const Duration(milliseconds: 450),
@@ -466,7 +519,7 @@ class _ProfilePageState extends State<ProfilePage>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            o['id'] as String,
+                            (o['id'] ?? o['_id'] ?? '').toString(),
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 16,
@@ -474,7 +527,7 @@ class _ProfilePageState extends State<ProfilePage>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            o['date'] as String,
+                            createdAt != null ? '${createdAt.toLocal()}' : '',
                             style: const TextStyle(color: Colors.black54),
                           ),
                         ],
@@ -498,7 +551,7 @@ class _ProfilePageState extends State<ProfilePage>
                           Icon(Icons.local_shipping, color: color, size: 16),
                           const SizedBox(width: 6),
                           Text(
-                            o['status'] as String,
+                            _statusLabel(status),
                             style: TextStyle(
                               color: color,
                               fontWeight: FontWeight.w700,
@@ -515,10 +568,10 @@ class _ProfilePageState extends State<ProfilePage>
                   height: 44,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: (o['thumbs'] as List).length,
+                    itemCount: thumbs.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, i) {
-                      final img = (o['thumbs'] as List)[i] as String;
+                      final img = thumbs[i];
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.asset(
@@ -536,11 +589,17 @@ class _ProfilePageState extends State<ProfilePage>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Total: ₹${(o['total'] as num).toStringAsFixed(0)}',
+                      'Total: ₹${total.toStringAsFixed(0)}',
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     TextButton.icon(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/home',
+                          arguments: {'initialTab': 1},
+                        );
+                      },
                       icon: const Icon(Icons.receipt_long),
                       label: const Text('View details'),
                       style: TextButton.styleFrom(foregroundColor: color),
@@ -562,9 +621,56 @@ class _ProfilePageState extends State<ProfilePage>
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
-        ...List.generate(orders.length, (i) => orderCard(orders[i], i)),
+        if (_loadingRecent)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_recentOrders.isEmpty)
+          const Text('No recent orders')
+        else
+          ...List.generate(
+            _recentOrders.length,
+            (i) => orderCard(_recentOrders[i], i),
+          ),
       ],
     );
+  }
+
+  Color _statusColor(String s) {
+    switch (s.toLowerCase()) {
+      case 'paid':
+        return Colors.green;
+      case 'cod-pending':
+        return Colors.orange;
+      case 'upi-pending':
+        return Colors.indigo;
+      case 'card-pending':
+        return Colors.purple;
+      case 'failed':
+        return Colors.red;
+      default:
+        return Colors.blueGrey;
+    }
+  }
+
+  String _statusLabel(String s) {
+    switch (s.toLowerCase()) {
+      case 'paid':
+        return 'Paid';
+      case 'cod-pending':
+        return 'COD Pending';
+      case 'upi-pending':
+        return 'UPI Pending';
+      case 'card-pending':
+        return 'Card Pending';
+      case 'failed':
+        return 'Failed';
+      default:
+        return 'Pending';
+    }
   }
 
   Widget _quickActions() {
@@ -672,184 +778,280 @@ class _ProfilePageState extends State<ProfilePage>
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 14),
-          _buildStatsCard(),
-          const SizedBox(height: 14),
-          _quickActions(),
-          const SizedBox(height: 14),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: Container(
-              key: ValueKey(_isEditing),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.05),
-                    Colors.white,
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.2),
-                ),
-                boxShadow: [
-                  BoxShadow(
+      body: RefreshIndicator(
+        onRefresh: _refreshFromBackend,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 14),
+            _buildStatsCard(),
+            const SizedBox(height: 14),
+            _quickActions(),
+            const SizedBox(height: 14),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Container(
+                key: ValueKey(_isEditing),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.05),
+                      Colors.white,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
                     color: Theme.of(
                       context,
-                    ).colorScheme.primary.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    ).colorScheme.primary.withValues(alpha: 0.2),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _isEditing ? 'Edit profile' : 'Profile info',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_isEditing) ...[
+                        _buildEditableField(
+                          label: 'Full name',
+                          controller: _nameController,
+                          icon: Icons.person,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildEditableField(
+                          label: 'Email',
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          icon: Icons.email,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildEditableField(
+                          label: 'Phone',
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          icon: Icons.phone,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildEditableField(
+                          label: 'Address',
+                          controller: _addressController,
+                          maxLines: 2,
+                          icon: Icons.location_on,
+                        ),
+                      ] else ...[
+                        _displayRow(
+                          icon: Icons.person,
+                          label: 'Name',
+                          value: _nameController.text.isEmpty
+                              ? 'Not set'
+                              : _nameController.text,
+                        ),
+                        const SizedBox(height: 8),
+                        _displayRow(
+                          icon: Icons.email,
+                          label: 'Email',
+                          value: _emailController.text.isEmpty
+                              ? 'Not set'
+                              : _emailController.text,
+                        ),
+                        const SizedBox(height: 8),
+                        _displayRow(
+                          icon: Icons.phone,
+                          label: 'Mobile',
+                          value: _phoneController.text.isEmpty
+                              ? 'Not set'
+                              : _phoneController.text,
+                        ),
+                        const SizedBox(height: 8),
+                        _displayRow(
+                          icon: Icons.location_on,
+                          label: 'Address',
+                          value: _addressController.text.isEmpty
+                              ? 'Not set'
+                              : _addressController.text,
+                          multiline: true,
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      if (_isEditing)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditing = false;
+                                    // revert changes by resetting controllers to original userData
+                                    _nameController.text =
+                                        widget.userData['name'] ?? '';
+                                    _emailController.text =
+                                        widget.userData['email'] ?? '';
+                                    _phoneController.text =
+                                        widget.userData['phone'] ?? '';
+                                    _addressController.text =
+                                        widget.userData['address'] ?? '';
+                                  });
+                                },
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _saveProfile,
+                                child: const Text('Save changes'),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Preferences
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    value: _notifEnabled,
+                    onChanged: (v) => setState(() => _notifEnabled = v),
+                    title: const Text('Notifications'),
+                    subtitle: const Text('Order updates and recommendations'),
+                    secondary: const Icon(Icons.notifications_active),
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    value: _marketingEnabled,
+                    onChanged: (v) => setState(() => _marketingEnabled = v),
+                    title: const Text('Offers & marketing'),
+                    subtitle: const Text('Get seasonal deals from VFC'),
+                    secondary: const Icon(Icons.local_offer),
                   ),
                 ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        _isEditing ? 'Edit profile' : 'Profile info',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildEditableField(
-                      label: 'Full name',
-                      controller: _nameController,
-                      icon: Icons.person,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildEditableField(
-                      label: 'Email',
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      icon: Icons.email,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildEditableField(
-                      label: 'Phone',
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      icon: Icons.phone,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildEditableField(
-                      label: 'Address',
-                      controller: _addressController,
-                      maxLines: 2,
-                      icon: Icons.location_on,
-                    ),
-                    const SizedBox(height: 12),
-                    if (_isEditing)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _isEditing = false;
-                                  // revert changes by resetting controllers to original userData
-                                  _nameController.text =
-                                      widget.userData['name'] ?? '';
-                                  _emailController.text =
-                                      widget.userData['email'] ?? '';
-                                  _phoneController.text =
-                                      widget.userData['phone'] ?? '';
-                                  _addressController.text =
-                                      widget.userData['address'] ?? '';
-                                });
-                              },
-                              child: const Text('Cancel'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _saveProfile,
-                              child: const Text('Save changes'),
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
+            ),
+            const SizedBox(height: 12),
+            _buildRecentOrders(),
+            const SizedBox(height: 18),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.settings),
+                title: const Text('Account settings'),
+                subtitle: const Text(
+                  'Manage password, payment methods and more',
                 ),
+                onTap: () {
+                  Navigator.pushNamed(context, '/settings');
+                },
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          // Preferences
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+            const SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Help & Support'),
+                onTap: () {
+                  AppSnack.showInfo(context, 'Support not available');
+                },
+              ),
             ),
+            const SizedBox(height: 18),
+            ElevatedButton.icon(
+              onPressed: _confirmLogout,
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Helper widget builders below class (kept simple for clarity)
+extension _ProfileVisualHelpers on _ProfilePageState {
+  Widget _displayRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool multiline = false,
+  }) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      decoration: BoxDecoration(
+        color: primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: primary.withOpacity(0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: multiline
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.center,
+        children: [
+          Icon(icon, color: primary),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SwitchListTile(
-                  value: _notifEnabled,
-                  onChanged: (v) => setState(() => _notifEnabled = v),
-                  title: const Text('Notifications'),
-                  subtitle: const Text('Order updates and recommendations'),
-                  secondary: const Icon(Icons.notifications_active),
+                Text(
+                  label.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: primary.withOpacity(0.75),
+                  ),
                 ),
-                const Divider(height: 1),
-                SwitchListTile(
-                  value: _marketingEnabled,
-                  onChanged: (v) => setState(() => _marketingEnabled = v),
-                  title: const Text('Offers & marketing'),
-                  subtitle: const Text('Get seasonal deals from VFC'),
-                  secondary: const Icon(Icons.local_offer),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          _buildRecentOrders(),
-          const SizedBox(height: 18),
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Account settings'),
-              subtitle: const Text('Manage password, payment methods and more'),
-              onTap: () {
-                Navigator.pushNamed(context, '/settings');
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ListTile(
-              leading: const Icon(Icons.help_outline),
-              title: const Text('Help & Support'),
-              onTap: () {
-                AppSnack.showInfo(context, 'Support not available');
-              },
-            ),
-          ),
-          const SizedBox(height: 18),
-          ElevatedButton.icon(
-            onPressed: _confirmLogout,
-            icon: const Icon(Icons.logout),
-            label: const Text('Logout'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-          ),
-          const SizedBox(height: 24),
         ],
       ),
     );

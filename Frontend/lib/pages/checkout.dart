@@ -4,7 +4,15 @@ import 'package:fruit_shop/pages/payment.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:fruit_shop/services/address_storage.dart';
+// Local orders storage removed; orders are persisted to backend only
+import 'package:fruit_shop/services/user_data_api.dart';
 import 'map_picker.dart';
+// Typed models
+import 'package:fruit_shop/models/address.dart';
+import 'package:fruit_shop/models/order_item.dart';
+import 'package:fruit_shop/models/pricing.dart';
+import 'package:fruit_shop/models/payment_info.dart';
+import 'package:fruit_shop/models/order.dart';
 import 'package:fruit_shop/widgets/app_snackbar.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -40,10 +48,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool saveAddress = true;
   bool setDefaultAddress = true;
 
-  double get subtotal => widget.cartItems.fold<double>(
-    0,
-    (sum, item) => sum + (item["price"] as num) * (item["quantity"] as num),
-  );
+  double get subtotal => widget.cartItems.fold<double>(0, (sum, item) {
+    final price = (item["price"] as num).toDouble();
+    final qty = (item["quantity"] as num?)?.toDouble() ?? 1.0;
+    final measure = (item['measure'] as num?)?.toDouble() ?? 1.0;
+    return sum + price * measure * qty;
+  });
   double get deliveryFee => subtotal >= 499 ? 0 : 29;
   double get total =>
       (subtotal - discountAmount + deliveryFee).clamp(0, double.infinity);
@@ -121,25 +131,159 @@ class _CheckoutPageState extends State<CheckoutPage> {
     return true;
   }
 
-  void placeOrder() {
+  Future<void> placeOrder() async {
     if (_formKey.currentState!.validate()) {
-      AppSnack.showSuccess(context, '✅ Order Placed Successfully!');
-
-      // Navigate to Payment Page with data
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentPage(
-            totalAmount: total,
-            paymentMethod: paymentMethod,
-            upiId: upiIdController.text,
-            cardNumber: cardNumberController.text,
+      // For Razorpay, defer order persistence to payment success
+      if (paymentMethod == 'Razorpay') {
+        // Optionally save address preferences now
+        if (saveAddress) {
+          final addr = {
+            'name': nameController.text,
+            'phone': phoneController.text,
+            'address': addressController.text,
+            'landmark': landmarkController.text,
+            'city': cityController.text,
+            'state': stateController.text,
+            'pincode': pincodeController.text,
+            'type': addressType,
+            'default': setDefaultAddress,
+          };
+          AddressStorage.save(addr);
+          // Mirror address to backend; ignore failures silently
+          try {
+            await UserDataApi.setAddress(addr);
+          } catch (_) {}
+        }
+        if (!mounted) return;
+        // Navigate to payment page with order context for later saving
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentPage(
+              totalAmount: total,
+              paymentMethod: paymentMethod,
+              upiId: upiIdController.text,
+              cardNumber: cardNumberController.text,
+              orderContext: {
+                'cartItems': widget.cartItems,
+                'pricing': {
+                  'subtotal': subtotal,
+                  'discount': discountAmount,
+                  'deliveryFee': deliveryFee,
+                  'total': total,
+                  'coupon': appliedCoupon,
+                },
+                'deliverySlot': deliverySlot,
+                'address': {
+                  'name': nameController.text,
+                  'phone': phoneController.text,
+                  'address': addressController.text,
+                  'landmark': landmarkController.text,
+                  'city': cityController.text,
+                  'state': stateController.text,
+                  'pincode': pincodeController.text,
+                  'type': addressType,
+                },
+              },
+            ),
           ),
-        ),
+        );
+        return;
+      }
+
+      // Build order object to persist (non-Razorpay flows)
+      final orderItems = widget.cartItems.map((item) {
+        final price = (item['price'] as num).toDouble();
+        final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+        final measure = (item['measure'] as num?)?.toDouble() ?? 1.0;
+        final lineTotal = price * measure * qty;
+        return OrderItem(
+          name: item['name']?.toString(),
+          price: price,
+          quantity: qty,
+          measure: measure,
+          unit: (item['unit'] as String?) ?? 'kg',
+          lineTotal: lineTotal,
+          image: item['image']?.toString(),
+        );
+      }).toList();
+
+      final pricing = Pricing(
+        subtotal: subtotal,
+        discount: discountAmount,
+        deliveryFee: deliveryFee,
+        total: total,
       );
 
-      if (saveAddress) {
-        AddressStorage.save({
+      final paymentInfo = PaymentInfo(
+        method: paymentMethod,
+        upiId: paymentMethod == 'UPI' ? upiIdController.text : null,
+        cardLast4:
+            paymentMethod == 'Card' && cardNumberController.text.length >= 4
+            ? cardNumberController.text.substring(
+                cardNumberController.text.length - 4,
+              )
+            : null,
+        status: paymentMethod == 'Cash on Delivery'
+            ? 'cod-pending'
+            : (paymentMethod == 'UPI'
+                  ? 'upi-pending'
+                  : (paymentMethod == 'Card' ? 'card-pending' : 'pending')),
+      );
+
+      final address = Address(
+        name: nameController.text,
+        phone: phoneController.text,
+        address: addressController.text,
+        landmark: landmarkController.text,
+        city: cityController.text,
+        state: stateController.text,
+        pincode: pincodeController.text,
+        type: addressType,
+      );
+
+      final orderModel = OrderModel(
+        items: orderItems,
+        pricing: pricing,
+        payment: paymentInfo,
+        address: address,
+        deliverySlot: deliverySlot,
+      );
+
+      // Persist order to backend (DB) only before navigating
+      try {
+        final result = await UserDataApi.createOrder(orderModel.toJson());
+        if (result == null || result.startsWith('ERROR:')) {
+          if (!mounted) return;
+          final msg =
+              result?.replaceFirst('ERROR:', '') ?? 'Unable to save order';
+          AppSnack.showError(context, 'Failed to save order ($msg)');
+          return;
+        }
+        // Clear server cart after placing order (non-Razorpay flows)
+        try {
+          await UserDataApi.setCart(const []);
+        } catch (_) {}
+      } catch (e) {
+        if (!mounted) return;
+        AppSnack.showError(context, 'Failed to save order (${e.toString()})');
+        return;
+      }
+
+      // After async gap, ensure widget is still mounted before using context
+      if (!mounted) return;
+
+      AppSnack.showSuccess(context, '✅ Order Placed Successfully!');
+      // Redirect straight to Orders tab (no extra payment page for COD/UPI/Card)
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/home',
+        (route) => false,
+        arguments: {'initialTab': 1},
+      );
+
+      if (saveAddress && paymentMethod != 'Razorpay') {
+        final addr = {
           'name': nameController.text,
           'phone': phoneController.text,
           'address': addressController.text,
@@ -149,7 +293,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
           'pincode': pincodeController.text,
           'type': addressType,
           'default': setDefaultAddress,
-        });
+        };
+        // Best-effort mirror before final navigation completes
+        AddressStorage.save(addr);
+        try {
+          await UserDataApi.setAddress(addr);
+        } catch (_) {}
       }
     }
   }
@@ -407,16 +556,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       title: Text(item['name']),
-                      subtitle: Text(
-                        'Qty: ${item['quantity']} × ₹${item['price']}',
-                      ),
-                      trailing: Text(
-                        '₹${(item['price'] as num) * (item['quantity'] as num)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                      subtitle: () {
+                        final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+                        final measure =
+                            (item['measure'] as num?)?.toDouble() ?? 1.0;
+                        final unit = (item['unit'] as String?) ?? 'kg';
+                        final price = (item['price'] as num).toDouble();
+                        return Text(
+                          'Qty: $qty × $measure$unit × ₹${price.toStringAsFixed(2)}',
+                        );
+                      }(),
+                      trailing: () {
+                        final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+                        final measure =
+                            (item['measure'] as num?)?.toDouble() ?? 1.0;
+                        final price = (item['price'] as num).toDouble();
+                        final line = price * measure * qty;
+                        return Text(
+                          '₹${line.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        );
+                      }(),
                     ),
                   ),
                   const Divider(),
@@ -737,6 +900,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     ? 'Enter valid card number'
                     : null,
               ),
+            methodTile('Razorpay', 'Razorpay'),
           ],
         ),
       ),

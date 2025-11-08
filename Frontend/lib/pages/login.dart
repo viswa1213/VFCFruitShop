@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fruit_shop/services/auth_service.dart';
 import 'package:fruit_shop/widgets/app_snackbar.dart';
+import 'package:fruit_shop/services/user_data_api.dart';
+import 'package:fruit_shop/services/favorites_storage.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -54,11 +56,11 @@ class _LoginPageState extends State<LoginPage>
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!mounted) return; // Guard before state change
     setState(() => _isLoading = true);
     try {
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
-      // Helpful debug to ensure we are calling the intended server/port
       final baseUrl = AuthService.getBaseUrl();
       // ignore: avoid_print
       print('Auth base URL: $baseUrl');
@@ -68,7 +70,16 @@ class _LoginPageState extends State<LoginPage>
       if (!mounted) return;
       if (result.containsKey('token')) {
         final user = (result['user'] as Map?) ?? {};
-        // Stylish success snackbar (reusable)
+        // One-shot hydration: fetch server state (cart, favorites, etc.)
+        try {
+          final me = await UserDataApi.getMe();
+          if (!mounted) return; // Guard context after async gap
+          if (me != null) {
+            final favs = (me['favorites'] as List?)?.cast<String>() ?? const [];
+            await FavoritesStorage.save(favs);
+          }
+        } catch (_) {}
+        if (!mounted) return;
         AppSnack.showSuccess(
           context,
           'Welcome back, ${user['name']?.toString() ?? 'User'}!',
@@ -79,6 +90,7 @@ class _LoginPageState extends State<LoginPage>
         };
         Navigator.pushReplacementNamed(context, '/home', arguments: args);
       } else {
+        if (!mounted) return;
         final msg = result['message'] ?? 'Invalid credentials';
         final status = result['status'];
         AppSnack.showError(
@@ -139,13 +151,21 @@ class _LoginPageState extends State<LoginPage>
                 opacity: _cardOpacity,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                    elevation: 8,
+                    padding: const EdgeInsets.all(25.0),
                     child: Padding(
-                      padding: const EdgeInsets.all(25.0),
+                      padding: EdgeInsets.zero,
                       child: Form(
                         key: _formKey,
                         child: Column(

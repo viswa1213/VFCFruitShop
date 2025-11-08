@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:fruit_shop/pages/cart.dart';
 import 'package:fruit_shop/pages/profile.dart';
+import 'package:fruit_shop/pages/orders.dart';
 import 'package:fruit_shop/widgets/app_drawer.dart';
 import 'package:fruit_shop/pages/settings.dart';
 import 'package:fruit_shop/widgets/app_snackbar.dart';
 import 'package:fruit_shop/services/app_theme.dart';
 import 'package:fruit_shop/services/favorites_storage.dart';
+import 'package:fruit_shop/services/user_data_api.dart';
+import 'package:fruit_shop/services/auth_service.dart';
 
 class HomePage extends StatefulWidget {
   final Map<String, String> userData;
@@ -22,6 +25,21 @@ class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey();
   int _selectedIndex = 0;
+  // Allow deep-link style selection of initial tab (e.g., Orders after placing an order)
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map && args['initialTab'] is int) {
+      final tab = args['initialTab'] as int;
+      if (tab >= 0 && tab <= 3) {
+        // Defer setState to next frame to avoid build conflicts
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _selectedIndex = tab);
+        });
+      }
+    }
+  }
 
   // Data loaded from assets/data/*.json
   List<Map<String, dynamic>> fruits = [];
@@ -39,6 +57,7 @@ class _HomePageState extends State<HomePage>
   List<Map<String, dynamic>> cart = [];
   final Set<String> favorites = <String>{};
   late final AnimationController _controller;
+  Timer? _cartSyncTimer;
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -91,6 +110,8 @@ class _HomePageState extends State<HomePage>
     _loadData();
     // Load persisted favorites so Profile page can reflect them too
     _loadFavorites();
+    // Load remote cart and merge with any locally added items
+    _loadRemoteCartAndMerge();
   }
 
   @override
@@ -153,13 +174,94 @@ class _HomePageState extends State<HomePage>
     });
   }
 
+  // --- Cart sync helpers ---
+  String _cartKey(Map<String, dynamic> item) {
+    final name = (item['name'] ?? '').toString();
+    final measure = ((item['measure'] as num?)?.toDouble() ?? 1.0).toString();
+    final unit = (item['unit'] ?? 'kg').toString();
+    return '$name|$measure|$unit';
+  }
+
+  List<Map<String, dynamic>> _mergeCarts(
+    List<Map<String, dynamic>> a,
+    List<Map<String, dynamic>> b,
+  ) {
+    final Map<String, Map<String, dynamic>> acc = {};
+    void addAll(List<Map<String, dynamic>> src) {
+      for (final it in src) {
+        final key = _cartKey(it);
+        final existing = acc[key];
+        final qty = (it['quantity'] as num?)?.toInt() ?? 1;
+        if (existing == null) {
+          acc[key] = {...it, 'quantity': qty};
+        } else {
+          acc[key] = {
+            ...existing,
+            'quantity': ((existing['quantity'] as num?)?.toInt() ?? 1) + qty,
+          };
+        }
+      }
+    }
+
+    addAll(a);
+    addAll(b);
+    return acc.values.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  Future<void> _loadRemoteCartAndMerge() async {
+    List<Map<String, dynamic>> remote = [];
+    try {
+      remote = await UserDataApi.getCart();
+    } catch (_) {}
+    if (remote.isEmpty) return;
+    final seed = DateTime.now().microsecondsSinceEpoch;
+    for (var i = 0; i < remote.length; i++) {
+      remote[i]['cartId'] ??= 'cart-$seed-$i-${remote[i]['name'] ?? 'item'}';
+      remote[i]['quantity'] = (remote[i]['quantity'] as num?)?.toInt() ?? 1;
+    }
+    if (!mounted) return;
+    setState(() {
+      cart = _mergeCarts(cart, remote);
+    });
+  }
+
+  void _scheduleCartSync() {
+    _cartSyncTimer?.cancel();
+    _cartSyncTimer = Timer(const Duration(milliseconds: 800), () async {
+      final payload = cart
+          .map(
+            (e) => {
+              'name': e['name'],
+              'image': e['image'],
+              'price': e['price'],
+              'measure': (e['measure'] as num?)?.toDouble() ?? 1.0,
+              'unit': e['unit'] ?? 'kg',
+              'quantity': (e['quantity'] as num?)?.toInt() ?? 1,
+            },
+          )
+          .toList();
+      try {
+        await UserDataApi.setCart(payload);
+      } catch (_) {}
+    });
+  }
+
   Future<void> _loadFavorites() async {
-    final stored = await FavoritesStorage.load();
+    // Try remote first (requires auth token); fallback to local storage.
+    List<String> remote = [];
+    try {
+      remote = await UserDataApi.getFavorites();
+    } catch (_) {
+      // ignore; likely unauthenticated or network issue
+    }
+    if (remote.isEmpty) {
+      remote = (await FavoritesStorage.load()).toList();
+    }
     if (!mounted) return;
     setState(() {
       favorites
         ..clear()
-        ..addAll(stored);
+        ..addAll(remote);
     });
   }
 
@@ -481,11 +583,13 @@ class _HomePageState extends State<HomePage>
         ...fruit,
         'measure': measure,
         'unit': unit,
+        'quantity': 1,
         'cartId':
             '${fruit['name']}-${DateTime.now().microsecondsSinceEpoch}-${cart.length}',
       };
       cart.add(item);
     });
+    _scheduleCartSync();
     // Styled success snackbar via reusable helper
     final unitLabel = unit == 'L' ? 'L' : 'kg';
     final itemName = fruit['name'] as String;
@@ -493,6 +597,37 @@ class _HomePageState extends State<HomePage>
       context,
       '$itemName ($measure$unitLabel) added to cart!',
     );
+  }
+
+  void _reorderItemsToCart(List<Map<String, dynamic>> items) {
+    int added = 0;
+    setState(() {
+      for (final item in items) {
+        final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+        final measure = (item['measure'] as num?)?.toDouble() ?? 1.0;
+        final unit = (item['unit'] as String?) ?? 'kg';
+        final base = {
+          'name': item['name'],
+          'image': item['image'],
+          'price': item['price'],
+          'measure': measure,
+          'unit': unit,
+        };
+        // Seed quantity on the item so CartPage can initialize counts
+        final cartItem = {
+          ...base,
+          'cartId':
+              '${item['name']}-${DateTime.now().microsecondsSinceEpoch}-${cart.length}',
+          'quantity': qty,
+        };
+        cart.add(cartItem);
+        added += qty;
+      }
+    });
+    if (added > 0) {
+      _scheduleCartSync();
+      AppSnack.showSuccess(context, 'Re-added $added item(s) to cart');
+    }
   }
 
   void _showWeightSelector(Map<String, dynamic> fruit) {
@@ -655,7 +790,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  void toggleFavorite(Map<String, dynamic> fruit) {
+  void toggleFavorite(Map<String, dynamic> fruit) async {
     final name = fruit['name'] as String;
     setState(() {
       if (favorites.contains(name)) {
@@ -664,8 +799,13 @@ class _HomePageState extends State<HomePage>
         favorites.add(name);
       }
     });
-    // Persist favorites so Profile page reflects the latest
-    FavoritesStorage.save(favorites.toList());
+    final list = favorites.toList();
+    // Optimistic local persist for offline usage
+    FavoritesStorage.save(list);
+    // Fire-and-forget remote sync; ignore failures
+    try {
+      await UserDataApi.setFavorites(list);
+    } catch (_) {}
   }
 
   Widget _cartIconWithBadge() {
@@ -673,11 +813,15 @@ class _HomePageState extends State<HomePage>
       children: [
         IconButton(
           icon: const Icon(Icons.shopping_cart),
-          onPressed: () {
-            Navigator.push(
+          onPressed: () async {
+            final updated = await Navigator.push<List<Map<String, dynamic>>>(
               context,
               MaterialPageRoute(builder: (_) => CartPage(cartItems: cart)),
             );
+            if (updated != null) {
+              setState(() => cart = updated);
+              _scheduleCartSync();
+            }
           },
         ),
         if (cart.isNotEmpty)
@@ -1801,9 +1945,9 @@ class _HomePageState extends State<HomePage>
         ),
       );
     }
-    // Orders - not implemented
+    // Orders Page
     if (_selectedIndex == 1) {
-      return const Center(child: Text('Orders not implemented'));
+      return OrdersPage(onReorder: _reorderItemsToCart);
     }
     // Favorites (grouped by section)
     if (_selectedIndex == 2) {
@@ -1918,8 +2062,36 @@ class _HomePageState extends State<HomePage>
             MaterialPageRoute(builder: (_) => const SettingsPage()),
           );
         },
-        onLogout: () {
-          Navigator.pop(context);
+        onLogout: () async {
+          if (!mounted) return;
+          Navigator.pop(context); // Close drawer immediately for UX
+          // Final cart sync (no debounce) to persist latest state
+          final payload = cart
+              .map(
+                (e) => {
+                  'name': e['name'],
+                  'image': e['image'],
+                  'price': e['price'],
+                  'measure': (e['measure'] as num?)?.toDouble() ?? 1.0,
+                  'unit': e['unit'] ?? 'kg',
+                  'quantity': (e['quantity'] as num?)?.toInt() ?? 1,
+                },
+              )
+              .toList();
+          try {
+            await UserDataApi.setCart(payload);
+          } catch (_) {}
+          if (!mounted) return;
+          // Clear local caches to avoid cross-account mixing
+          setState(() {
+            cart.clear();
+            favorites.clear();
+          });
+          try {
+            await FavoritesStorage.clear();
+          } catch (_) {}
+          await AuthService.logout();
+          if (!mounted) return;
           Navigator.pushReplacementNamed(context, '/login');
         },
       ),

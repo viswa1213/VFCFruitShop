@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:fruit_shop/pages/home.dart';
 import 'package:fruit_shop/pages/login.dart';
 import 'package:fruit_shop/pages/register.dart';
@@ -7,6 +8,11 @@ import 'package:fruit_shop/pages/settings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('dotenv load failed: $e');
+  }
   await AppTheme.load();
   runApp(const MyApp());
 }
@@ -112,10 +118,22 @@ class MyApp extends StatelessWidget {
                 '/login': (context) => const LoginPage(),
                 '/register': (context) => const RegisterPage(),
                 '/home': (context) {
-                  final userData =
-                      ModalRoute.of(context)!.settings.arguments
-                          as Map<String, String>? ??
-                      {};
+                  final args = ModalRoute.of(context)!.settings.arguments;
+                  Map<String, String> userData = {};
+                  // initialTab handled by HomePage via route arguments; no local use needed here.
+                  if (args is Map<String, String>) {
+                    userData = args;
+                  } else if (args is Map) {
+                    final ud = args['userData'];
+                    if (ud is Map) {
+                      // Try to coerce keys/values to String
+                      userData = ud.map<String, String>(
+                        (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+                      );
+                    }
+                    // HomePage will read args['initialTab'] itself; nothing to do here.
+                  }
+                  // If no explicit initialTab, default remains Home (0); HomePage reads it via route args too
                   return HomePage(userData: userData);
                 },
                 '/settings': (context) => const SettingsPage(),
