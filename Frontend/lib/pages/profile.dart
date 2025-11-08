@@ -993,7 +993,8 @@ class _ProfilePageState extends State<ProfilePage>
               icon: const Icon(Icons.logout),
               label: const Text('Logout'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
               ),
             ),
             const SizedBox(height: 24),

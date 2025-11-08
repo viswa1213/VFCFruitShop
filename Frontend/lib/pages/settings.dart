@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fruit_shop/services/app_theme.dart';
+import 'package:fruit_shop/services/ui_colors.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -71,9 +72,10 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
+                  color: UiColors.textPrimary(context),
                 ),
               ),
             ],
@@ -98,14 +100,17 @@ class SettingsPage extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'Appearance',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: UiColors.textPrimary(context),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            const Text('Theme', style: TextStyle(color: Colors.black54)),
+            Text('Theme', style: TextStyle(color: UiColors.textSecondary(context))),
             const SizedBox(height: 6),
             ValueListenableBuilder<ThemeMode>(
               valueListenable: AppTheme.mode,
@@ -143,17 +148,30 @@ class SettingsPage extends StatelessWidget {
               },
             ),
             const SizedBox(height: 10),
-            const Text('Accent color', style: TextStyle(color: Colors.black54)),
+            Text('Accent color', style: TextStyle(color: UiColors.textSecondary(context))),
             const SizedBox(height: 8),
             ValueListenableBuilder<Color>(
               valueListenable: AppTheme.accent,
               builder: (context, color, _) {
                 final options = <Color>[
                   Theme.of(context).colorScheme.primary,
-                  Colors.teal.shade600,
-                  Colors.orange.shade600,
+                  Colors.red.shade600,
+                  Colors.pink.shade400,
                   Colors.purple.shade600,
+                  Colors.deepPurple.shade600,
+                  Colors.indigo.shade600,
                   Colors.blue.shade600,
+                  Colors.lightBlue.shade600,
+                  Colors.cyan.shade600,
+                  Colors.teal.shade600,
+                  Colors.green.shade600,
+                  Colors.lightGreen.shade600,
+                  Colors.lime.shade700,
+                  Colors.amber.shade700,
+                  Colors.orange.shade700,
+                  Colors.deepOrange.shade600,
+                  Colors.brown.shade600,
+                  Colors.blueGrey.shade600,
                 ];
                 return Wrap(
                   spacing: 10,
@@ -177,7 +195,12 @@ class SettingsPage extends StatelessWidget {
                                 ]
                               : null,
                           border: Border.all(
-                            color: selected ? Colors.white : Colors.black12,
+              color: selected
+                ? Theme.of(context).colorScheme.onSurface
+                : Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withOpacity(0.12),
                             width: 2,
                           ),
                         ),

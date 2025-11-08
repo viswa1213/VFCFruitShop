@@ -714,7 +714,7 @@ class _HomePageState extends State<HomePage>
                                 : Colors.white,
                             foregroundColor: isSelected
                                 ? Colors.white
-                                : Colors.black87,
+                                : Theme.of(context).colorScheme.onSurface,
                             side: BorderSide(
                               color: isSelected
                                   ? Theme.of(context).colorScheme.primary
@@ -893,7 +893,7 @@ class _HomePageState extends State<HomePage>
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Colors.black.withValues(alpha: 0.15),
+                                        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                                         Colors.transparent,
                                       ],
                                       begin: Alignment.bottomCenter,
@@ -910,7 +910,7 @@ class _HomePageState extends State<HomePage>
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withValues(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(
                                         alpha: 0.35,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -1120,10 +1120,15 @@ class _HomePageState extends State<HomePage>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 'From everyday staples to seasonal favorites, VFC is your go-to for better fruit—delivered.',
-                                style: TextStyle(color: Colors.black54),
+                                style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.70),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1285,18 +1290,22 @@ class _HomePageState extends State<HomePage>
                     children: [
                       Text(
                         '₹${price.round()}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(width: 8),
                       if (original != null)
                         Text(
                           '₹$original',
-                          style: const TextStyle(
+                          style: TextStyle(
                             decoration: TextDecoration.lineThrough,
-                            color: Colors.black38,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.38),
                           ),
                         ),
                     ],
@@ -1507,9 +1516,12 @@ class _HomePageState extends State<HomePage>
                                   const SizedBox(width: 2),
                                   Text(
                                     (fruit['rating'] as num).toStringAsFixed(1),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.black54,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withOpacity(0.70),
                                     ),
                                   ),
                                 ],
@@ -1715,9 +1727,12 @@ class _HomePageState extends State<HomePage>
                                       ((fruit['rating'] as num?)?.toDouble() ??
                                               0)
                                           .toStringAsFixed(1),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.black54,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withOpacity(0.70),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -1763,10 +1778,13 @@ class _HomePageState extends State<HomePage>
                                         if (original != null)
                                           Text(
                                             '₹$original',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               decoration:
                                                   TextDecoration.lineThrough,
-                                              color: Colors.black38,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.38),
                                               fontSize: 12,
                                             ),
                                           ),

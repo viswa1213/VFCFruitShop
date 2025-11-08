@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fruit_shop/services/app_theme.dart';
+import 'package:fruit_shop/services/user_data_api.dart';
 
-class AppDrawer extends StatelessWidget {
+class AppDrawer extends StatefulWidget {
   final Map<String, String> userData;
   final int cartCount;
   final VoidCallback? onOpenHome;
@@ -24,10 +25,39 @@ class AppDrawer extends StatelessWidget {
   });
 
   @override
+  State<AppDrawer> createState() => _AppDrawerState();
+}
+
+class _AppDrawerState extends State<AppDrawer> {
+  Map<String, dynamic>? _me;
+  // reserved for potential loading indicator on header fetch
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMe();
+  }
+
+  Future<void> _loadMe() async {
+  // no visual loader needed in drawer header; fetch quietly
+    try {
+      final me = await UserDataApi.getMe();
+      if (!mounted) return;
+      setState(() => _me = me);
+    } catch (_) {
+      // ignore network/auth issues; fallback to provided userData
+    } finally {}
+  }
+
+  @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    final userName = userData['name'] ?? 'Guest';
-    final userEmail = userData['email'] ?? 'No email provided';
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final userName = (_me?['name']?.toString() ?? widget.userData['name']) ?? 'Guest';
+    final userEmail = (_me?['email']?.toString() ?? widget.userData['email']) ?? 'No email provided';
+    final address = (_me?['address'] as Map?)?.cast<String, dynamic>();
+    final userPhone = (_me?['phone']?.toString() ?? address?['phone']?.toString() ?? '').trim();
 
     Widget item({
       required IconData icon,
@@ -51,7 +81,10 @@ class AppDrawer extends StatelessWidget {
           leading: Icon(icon, color: primary),
           title: Text(
             label,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: onSurface,
+            ),
           ),
           trailing: trailing,
           onTap: onTap,
@@ -108,10 +141,11 @@ class AppDrawer extends StatelessWidget {
                             children: [
                               Row(
                                 children: [
-                                  const Text(
+                                  Text(
                                     'VFC🍎',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w900,
+                                      color: onSurface,
                                     ),
                                   ),
                                   const SizedBox(width: 6),
@@ -149,17 +183,26 @@ class AppDrawer extends StatelessWidget {
                               const SizedBox(height: 4),
                               Text(
                                 userName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
+                                  color: onSurface,
                                 ),
                               ),
                               Text(
                                 userEmail,
                                 style: TextStyle(
-                                  color: Colors.grey.shade600,
+                                  color: onSurface.withOpacity(isDark ? 0.9 : 0.75),
                                   fontSize: 12,
                                 ),
                               ),
+                              if (userPhone.isNotEmpty)
+                                Text(
+                                  userPhone,
+                                  style: TextStyle(
+                                    color: onSurface.withOpacity(isDark ? 0.9 : 0.75),
+                                    fontSize: 12,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -173,7 +216,8 @@ class AppDrawer extends StatelessWidget {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    // Use themed surface for better contrast in dark mode
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(16),
                     ),
@@ -187,19 +231,19 @@ class AppDrawer extends StatelessWidget {
                       item(
                         icon: Icons.home,
                         label: 'Home',
-                        onTap: onOpenHome,
+                        onTap: widget.onOpenHome,
                         index: 0,
                       ),
                       item(
                         icon: Icons.shopping_cart,
                         label: 'Cart',
-                        onTap: onOpenCart,
-                        trailing: cartCount > 0
+                        onTap: widget.onOpenCart,
+                        trailing: widget.cartCount > 0
                             ? CircleAvatar(
                                 radius: 12,
                                 backgroundColor: Colors.red,
                                 child: Text(
-                                  cartCount.toString(),
+                                  widget.cartCount.toString(),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -213,7 +257,7 @@ class AppDrawer extends StatelessWidget {
                       item(
                         icon: Icons.favorite,
                         label: 'Favorites',
-                        onTap: onOpenFavorites,
+                        onTap: widget.onOpenFavorites,
                         index: 2,
                       ),
                       const Divider(),
@@ -222,9 +266,12 @@ class AppDrawer extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8.0),
                         child: ExpansionTile(
                           leading: Icon(Icons.color_lens, color: primary),
-                          title: const Text(
+                          title: Text(
                             'Appearance',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: onSurface,
+                            ),
                           ),
                           childrenPadding: const EdgeInsets.only(
                             left: 16,
@@ -239,10 +286,10 @@ class AppDrawer extends StatelessWidget {
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Theme',
                                       style: TextStyle(
-                                        color: Colors.black54,
+                                        color: onSurface.withOpacity(0.75),
                                         fontSize: 12,
                                       ),
                                     ),
@@ -255,7 +302,10 @@ class AppDrawer extends StatelessWidget {
                                             Icons.wb_sunny_outlined,
                                             size: 16,
                                           ),
-                                          label: const Text('Light'),
+                                          label: Text(
+                                            'Light',
+                                            style: TextStyle(color: onSurface),
+                                          ),
                                           selected: mode == ThemeMode.light,
                                           onSelected: (_) =>
                                               AppTheme.set(ThemeMode.light),
@@ -265,7 +315,10 @@ class AppDrawer extends StatelessWidget {
                                             Icons.dark_mode_outlined,
                                             size: 16,
                                           ),
-                                          label: const Text('Dark'),
+                                          label: Text(
+                                            'Dark',
+                                            style: TextStyle(color: onSurface),
+                                          ),
                                           selected: mode == ThemeMode.dark,
                                           onSelected: (_) =>
                                               AppTheme.set(ThemeMode.dark),
@@ -275,7 +328,10 @@ class AppDrawer extends StatelessWidget {
                                             Icons.phone_iphone,
                                             size: 16,
                                           ),
-                                          label: const Text('System'),
+                                          label: Text(
+                                            'System',
+                                            style: TextStyle(color: onSurface),
+                                          ),
                                           selected: mode == ThemeMode.system,
                                           onSelected: (_) =>
                                               AppTheme.set(ThemeMode.system),
@@ -293,10 +349,23 @@ class AppDrawer extends StatelessWidget {
                               builder: (context, color, _) {
                                 final options = <Color>[
                                   primary,
-                                  Colors.teal.shade600,
-                                  Colors.orange.shade600,
+                                  Colors.red.shade600,
+                                  Colors.pink.shade400,
                                   Colors.purple.shade600,
+                                  Colors.deepPurple.shade600,
+                                  Colors.indigo.shade600,
                                   Colors.blue.shade600,
+                                  Colors.lightBlue.shade600,
+                                  Colors.cyan.shade600,
+                                  Colors.teal.shade600,
+                                  Colors.green.shade600,
+                                  Colors.lightGreen.shade600,
+                                  Colors.lime.shade700,
+                                  Colors.amber.shade700,
+                                  Colors.orange.shade700,
+                                  Colors.deepOrange.shade600,
+                                  Colors.brown.shade600,
+                                  Colors.blueGrey.shade600,
                                 ];
                                 return Wrap(
                                   spacing: 10,
@@ -344,20 +413,20 @@ class AppDrawer extends StatelessWidget {
                       item(
                         icon: Icons.person,
                         label: 'Profile',
-                        onTap: onOpenProfile,
+                        onTap: widget.onOpenProfile,
                         index: 3,
                       ),
                       item(
                         icon: Icons.settings,
                         label: 'Settings',
-                        onTap: onOpenSettings,
+                        onTap: widget.onOpenSettings,
                         index: 4,
                       ),
                       const SizedBox(height: 4),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8.0),
                         child: ElevatedButton.icon(
-                          onPressed: onLogout,
+                          onPressed: widget.onLogout,
                           icon: const Icon(Icons.logout),
                           label: const Text('Logout'),
                           style: ElevatedButton.styleFrom(
