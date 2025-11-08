@@ -22,7 +22,6 @@ class _LoginPageState extends State<LoginPage>
   late Animation<double> _cardOpacity;
   late Animation<Offset> _cardSlide;
   double _buttonScale = 1.0;
-  bool _hoveringCard = false;
 
   @override
   void initState() {
@@ -99,14 +98,9 @@ class _LoginPageState extends State<LoginPage>
     return Scaffold(
       body: Stack(
         children: [
-          // Background image - prefer hero-fruits.jpg if provided in assets, else fall back to cherry.avif
+          // Background image
           Positioned.fill(
-            child: Image.asset(
-              'assets/images/hero-fruits.jpg',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  Image.asset('assets/images/cherry.avif', fit: BoxFit.cover),
-            ),
+            child: Image.asset('assets/images/cherry.avif', fit: BoxFit.cover),
           ),
           // Animated background driven by accent color
           TweenAnimationBuilder<double>(
@@ -137,7 +131,7 @@ class _LoginPageState extends State<LoginPage>
             },
           ),
 
-          // Centered animated login card (interactive)
+          // Centered animated login card
           Center(
             child: SlideTransition(
               position: _cardSlide,
@@ -145,22 +139,14 @@ class _LoginPageState extends State<LoginPage>
                 opacity: _cardOpacity,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: MouseRegion(
-                    onEnter: (_) => setState(() => _hoveringCard = true),
-                    onExit: (_) => setState(() => _hoveringCard = false),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      transform: Matrix4.identity()..scale(_hoveringCard ? 1.02 : 1.0),
-                      child: Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 12,
-                        shadowColor:
-                            Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(25.0),
-                          child: Form(
+                  child: Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 8,
+                    child: Padding(
+                      padding: const EdgeInsets.all(25.0),
+                      child: Form(
                         key: _formKey,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
