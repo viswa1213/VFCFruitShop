@@ -1,0 +1,114 @@
+{
+  "Apple": {
+    "description": "Crisp, sweet, and versatile. Apples are rich in fiber and antioxidants.",
+    "benefits": [
+      "Supports heart health with soluble fiber (pectin)",
+      "May aid weight management by increasing satiety",
+      "Contains quercetin and vitamin C for immune support"
+    ]
+  },
+  "Banana": {
+    "description": "Creamy and energy-dense fruit, perfect for pre- and post-workout snacks.",
+    "benefits": [
+      "High in potassium which supports healthy blood pressure",
+      "Natural sugars and fiber provide sustained energy",
+      "Contains vitamin B6 for metabolism"
+    ]
+  },
+  "Orange": {
+    "description": "Zesty citrus packed with vitamin C and refreshing juice.",
+    "benefits": [
+      "Excellent source of vitamin C for immune health",
+      "Citrus flavonoids may support healthy inflammation response",
+      "Hydrating and low in calories"
+    ]
+  },
+  "Mango": {
+    "description": "Fragrant and juicy tropical fruit known as the king of fruits.",
+    "benefits": [
+      "Rich in vitamin A for vision and skin",
+      "Contains digestive enzymes (amylases)",
+      "Polyphenols may support cell protection"
+    ]
+  },
+  "Cherry": {
+    "description": "Sweet-tart berries with deep red pigments (anthocyanins).",
+    "benefits": [
+      "Anthocyanins may support recovery after exercise",
+      "Vitamin C and potassium for overall wellness",
+      "May support healthy sleep (contains melatonin)"
+    ]
+  },
+  "Green Apple": {
+    "description": "Tart and crisp, with slightly fewer sugars than sweeter varieties.",
+    "benefits": [
+      "High in fiber for digestive support",
+      "Polyphenols may support healthy blood sugar response",
+      "Low-calorie snack option"
+    ]
+  },
+  "Avacado": {
+    "description": "Creamy, nutrient-dense fruit rich in healthy fats.",
+    "benefits": [
+      "High in monounsaturated fats for heart health",
+      "Fiber supports digestion and satiety",
+      "Contains potassium and folate"
+    ]
+  },
+  "kiwi": {
+    "description": "Bright green, tangy fruit with tiny edible seeds.",
+    "benefits": [
+      "Very high in vitamin C",
+      "Actinidin enzyme may assist digestion",
+      "Antioxidants support immune health"
+    ]
+  },
+  "Blue berry": {
+    "description": "Small, sweet berries packed with antioxidants.",
+    "benefits": [
+      "Anthocyanins support cognitive and heart health",
+      "Low in calories, high in fiber",
+      "May support healthy blood sugar"
+    ]
+  },
+  "dragonfruit": {
+    "description": "Exotic cactus fruit with mildly sweet flavor and crunchy seeds.",
+    "benefits": [
+      "Hydrating and fiber-rich",
+      "Contains prebiotics to support gut health",
+      "Vitamin C and antioxidants"
+    ]
+  },
+  "Gouva": {
+    "description": "Aromatic tropical fruit with a seedy, sweet-tart interior (guava).",
+    "benefits": [
+      "High in vitamin C—often more than oranges",
+      "Fiber supports digestion",
+      "May support healthy blood sugar"
+    ]
+  },
+  "dates": {
+    "description": "Caramel-like sweet fruit from date palms, nutrient dense.",
+    "benefits": [
+      "Natural energy source with fiber",
+      "Contains minerals like potassium and magnesium",
+      "Popular for pre-workout and fasting breaks"
+    ]
+  },
+  "Red banana": {
+    "description": "Red-skinned bananas with a creamy, slightly raspberry-like flavor.",
+    "benefits": [
+      "Rich in beta carotene and vitamin C",
+      "Potassium supports heart health",
+      "Fiber for digestive wellness"
+    ]
+  },
+  "cheetha": {
+    "description": "Local seasonal specialty (example entry).",
+    "benefits": [
+      "Rich in seasonal antioxidants",
+      "Tasty snack option",
+      "Pairs well in fruit salads"
+    ]
+  }
+}

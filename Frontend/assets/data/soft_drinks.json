@@ -1,0 +1,35 @@
+[
+  {
+    "name": "Cola",
+    "price": 45,
+    "image": "assets/images/cococola.avif",
+    "category": "Soft Drink",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 1200,
+    "addedAt": "2025-10-19",
+    "isFeatured": false
+  },
+  {
+    "name": "Pepsi",
+    "price": 35,
+    "image": "assets/images/pepsi.avif",
+    "category": "Soft Drink",
+    "rating": 4.3,
+    "discount": 5,
+    "sold": 980,
+    "addedAt": "2025-10-18",
+    "isFeatured": false
+  },
+  {
+    "name": "Thumbs Up",
+    "price": 40,
+    "image": "assets/images/thumbsup.avif",
+    "category": "Soft Drink",
+    "rating": 4.0,
+    "discount": 0,
+    "sold": 760,
+    "addedAt": "2025-10-20",
+    "isFeatured": false
+  }
+]

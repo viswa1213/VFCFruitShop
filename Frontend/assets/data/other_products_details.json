@@ -1,0 +1,26 @@
+{
+  "Dates": {
+    "description": "Naturally sweet dry fruit with a caramel-like taste.",
+    "benefits": [
+      "Fiber supports digestion",
+      "Minerals like potassium and magnesium",
+      "Great pre-workout or fasting snack"
+    ]
+  },
+  "Potato Chips": {
+    "description": "Crispy salted snack made from thinly sliced potatoes.",
+    "benefits": [
+      "Crunchy snack for sharing",
+      "Pairs with dips",
+      "Enjoy in moderation"
+    ]
+  },
+  "Honey": {
+    "description": "Golden natural sweetener produced by honey bees.",
+    "benefits": [
+      "Natural sweetener for tea and breakfast",
+      "Contains trace antioxidants",
+      "Soothing in warm drinks"
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "Cola": {
+    "description": "Classic carbonated soft drink with caramel notes.",
+    "benefits": [
+      "Occasional treat—enjoy responsibly",
+      "Pairs well with snacks",
+      "Caffeine may provide a quick boost"
+    ]
+  },
+  "Lemon Soda": {
+    "description": "Zesty lemon-flavored soda with a bubbly finish.",
+    "benefits": [
+      "Refreshing on hot days",
+      "Citrus zest flavor",
+      "Great base for mocktails"
+    ]
+  },
+  "Orange Fizz": {
+    "description": "Orange-flavored fizzy drink with a sweet-tang balance.",
+    "benefits": [
+      "Fun, fizzy alternative to juice",
+      "Citrus-forward taste",
+      "Serve well-chilled"
+    ]
+  }
+}

@@ -1,0 +1,157 @@
+[
+  {
+    "name": "Apple",
+    "price": 300,
+    "image": "assets/images/apple.avif",
+    "category": "Pome",
+    "rating": 4.6,
+    "discount": 10,
+    "sold": 1200,
+    "addedAt": "2025-10-01",
+    "isFeatured": true
+  },
+  {
+    "name": "Banana",
+    "price": 20,
+    "image": "assets/images/Banana.avif",
+    "category": "Tropical",
+    "rating": 4.2,
+    "discount": 0,
+    "sold": 2400,
+    "addedAt": "2025-10-15",
+    "isFeatured": false
+  },
+  {
+    "name": "Orange",
+    "price": 500,
+    "image": "assets/images/orange.avif",
+    "category": "Citrus",
+    "rating": 4.4,
+    "discount": 15,
+    "sold": 900,
+    "addedAt": "2025-09-28",
+    "isFeatured": true
+  },
+  {
+    "name": "Mango",
+    "price": 300,
+    "image": "assets/images/mango.jpg",
+    "category": "Tropical",
+    "rating": 4.8,
+    "discount": 5,
+    "sold": 3100,
+    "addedAt": "2025-10-20",
+    "isFeatured": true
+  },
+  {
+    "name": "Cherry",
+    "price": 499,
+    "image": "assets/images/cherry.avif",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  },
+  {
+    "name": "Red banana",
+    "price": 499,
+    "image": "assets/images/redbanana.jpg",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  },
+  {
+    "name": "kiwi",
+    "price": 499,
+    "image": "assets/images/kiwi.jpg",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  },
+  {
+    "name": "Avacado",
+    "price": 499,
+    "image": "assets/images/avacado.avif",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  },
+  {
+    "name": "Blue berry",
+    "price": 499,
+    "image": "assets/images/blueberry.jpg",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  },
+  {
+    "name": "cheetha",
+    "price": 499,
+    "image": "assets/images/cheetha.jpg",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  },
+  {
+    "name": "dates",
+    "price": 499,
+    "image": "assets/images/dates.jpg",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  },
+  {
+    "name": "dragonfruit",
+    "price": 499,
+    "image": "assets/images/dragonfruit.jpg",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  },
+  {
+    "name": "Gouva",
+    "price": 499,
+    "image": "assets/images/gouva.jpg",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  },
+  {
+    "name": "Green Apple",
+    "price": 499,
+    "image": "assets/images/greenapple.jpg",
+    "category": "Berry",
+    "rating": 4.1,
+    "discount": 0,
+    "sold": 650,
+    "addedAt": "2025-09-30",
+    "isFeatured": false
+  }
+  
+]

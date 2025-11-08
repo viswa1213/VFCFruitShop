@@ -1,0 +1,50 @@
+{
+  "Orange Juice": {
+    "description": "Freshly squeezed, bright citrus juice rich in vitamin C.",
+    "benefits": [
+      "Boosts immune function with vitamin C",
+      "Hydrating and refreshing",
+      "Citrus flavonoids may support heart health"
+    ]
+  },
+  "Apple Juice": {
+    "description": "Naturally sweet and mild juice pressed from crisp apples.",
+    "benefits": [
+      "Provides quick energy from natural sugars",
+      "Contains polyphenols with antioxidant properties",
+      "Pleasant option for kids and elders"
+    ]
+  },
+  "Mango Smoothie": {
+    "description": "Creamy mango-based smoothie—fruit plus dairy/plant-based blend.",
+    "benefits": [
+      "Energizing snack with carbs and optional protein",
+      "Vitamin A supports vision and skin",
+      "Great post-workout refuel"
+    ]
+  },
+  "Pomegranate Juice": {
+    "description": "Deep ruby juice known for polyphenols and tart-sweet taste.",
+    "benefits": [
+      "Polyphenols may support cardiovascular health",
+      "Rich in antioxidants",
+      "Pairs well in mocktails"
+    ]
+  },
+  "Mixed Berry Juice": {
+    "description": "Blend of berries with vibrant color and tangy-sweet flavor.",
+    "benefits": [
+      "Anthocyanins support brain and heart health",
+      "Low in fat, flavorful choice",
+      "Antioxidant-rich hydration"
+    ]
+  },
+  "Pineapple Juice": {
+    "description": "Tropical juice with bright sweetness and bromelain enzyme.",
+    "benefits": [
+      "Contains bromelain which may support digestion",
+      "Vitamin C rich",
+      "Great in smoothies and marinades"
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "name": "Dates",
+    "price": 220,
+    "image": "assets/images/cherry.avif",
+    "category": "Dry Fruit",
+    "rating": 4.6,
+    "discount": 10,
+    "sold": 540,
+    "addedAt": "2025-10-11",
+    "isFeatured": true
+  },
+  {
+    "name": "Potato Chips",
+    "price": 60,
+    "image": "assets/images/Pomegranate.avif",
+    "category": "Snacks",
+    "rating": 4.2,
+    "discount": 0,
+    "sold": 820,
+    "addedAt": "2025-10-14",
+    "isFeatured": false
+  },
+  {
+    "name": "Honey",
+    "price": 180,
+    "image": "assets/images/cherry.avif",
+    "category": "Grocery",
+    "rating": 4.7,
+    "discount": 8,
+    "sold": 430,
+    "addedAt": "2025-10-09",
+    "isFeatured": true
+  }
+]

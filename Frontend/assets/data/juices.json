@@ -1,0 +1,79 @@
+[
+  {
+    "name": "Orange Juice",
+    "price": 120,
+    "image": "assets/images/orangejuice.avif",
+    "category": "Juice",
+    "rating": 4.5,
+    "discount": 10,
+    "sold": 800,
+    "addedAt": "2025-10-05",
+    "isFeatured": true
+  },
+  {
+    "name": "Apple Juice",
+    "price": 110,
+    "image": "assets/images/apple.avif",
+    "category": "Juice",
+    "rating": 4.3,
+    "discount": 0,
+    "sold": 620,
+    "addedAt": "2025-10-16",
+    "isFeatured": false
+  },
+  {
+    "name": "Mango Smoothie",
+    "price": 150,
+    "image": "assets/images/mangojuice.avif",
+    "category": "Smoothie",
+    "rating": 4.7,
+    "discount": 5,
+    "sold": 950,
+    "addedAt": "2025-10-20",
+    "isFeatured": true
+  },
+  {
+    "name": "Pomegranate Juice",
+    "price": 160,
+    "image": "assets/images/pomegranatejuice.avif",
+    "category": "Juice",
+    "rating": 4.6,
+    "discount": 12,
+    "sold": 540,
+    "addedAt": "2025-10-10",
+    "isFeatured": false
+  },
+  {
+    "name": "Mixed Berry Juice",
+    "price": 140,
+    "image": "assets/images/blueberrryjuice.avif",
+    "category": "Juice",
+    "rating": 4.4,
+    "discount": 8,
+    "sold": 430,
+    "addedAt": "2025-10-12",
+    "isFeatured": false
+  },
+  {
+    "name": "kiwi Juice",
+    "price": 130,
+    "image": "assets/images/kiwijuice.avif",
+    "category": "Juice",
+    "rating": 4.2,
+    "discount": 0,
+    "sold": 510,
+    "addedAt": "2025-10-08",
+    "isFeatured": false
+  },
+  {
+    "name": "Rose Milk Juice",
+    "price": 130,
+    "image": "assets/images/rosemilk.avif",
+    "category": "Juice",
+    "rating": 4.2,
+    "discount": 0,
+    "sold": 510,
+    "addedAt": "2025-10-08",
+    "isFeatured": false
+  }
+]
