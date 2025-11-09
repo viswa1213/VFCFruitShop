@@ -39,7 +39,7 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 
   Future<void> _loadMe() async {
-  // no visual loader needed in drawer header; fetch quietly
+    // no visual loader needed in drawer header; fetch quietly
     try {
       final me = await UserDataApi.getMe();
       if (!mounted) return;
@@ -54,10 +54,15 @@ class _AppDrawerState extends State<AppDrawer> {
     final primary = Theme.of(context).colorScheme.primary;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final userName = (_me?['name']?.toString() ?? widget.userData['name']) ?? 'Guest';
-    final userEmail = (_me?['email']?.toString() ?? widget.userData['email']) ?? 'No email provided';
+    final userName =
+        (_me?['name']?.toString() ?? widget.userData['name']) ?? 'Guest';
+    final userEmail =
+        (_me?['email']?.toString() ?? widget.userData['email']) ??
+        'No email provided';
     final address = (_me?['address'] as Map?)?.cast<String, dynamic>();
-    final userPhone = (_me?['phone']?.toString() ?? address?['phone']?.toString() ?? '').trim();
+    final userPhone =
+        (_me?['phone']?.toString() ?? address?['phone']?.toString() ?? '')
+            .trim();
 
     Widget item({
       required IconData icon,
@@ -81,10 +86,7 @@ class _AppDrawerState extends State<AppDrawer> {
           leading: Icon(icon, color: primary),
           title: Text(
             label,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: onSurface,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w600, color: onSurface),
           ),
           trailing: trailing,
           onTap: onTap,
@@ -191,7 +193,9 @@ class _AppDrawerState extends State<AppDrawer> {
                               Text(
                                 userEmail,
                                 style: TextStyle(
-                                  color: onSurface.withOpacity(isDark ? 0.9 : 0.75),
+                                  color: onSurface.withOpacity(
+                                    isDark ? 0.9 : 0.75,
+                                  ),
                                   fontSize: 12,
                                 ),
                               ),
@@ -199,7 +203,9 @@ class _AppDrawerState extends State<AppDrawer> {
                                 Text(
                                   userPhone,
                                   style: TextStyle(
-                                    color: onSurface.withOpacity(isDark ? 0.9 : 0.75),
+                                    color: onSurface.withOpacity(
+                                      isDark ? 0.9 : 0.75,
+                                    ),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -279,70 +285,8 @@ class _AppDrawerState extends State<AppDrawer> {
                             bottom: 8,
                           ),
                           children: [
-                            // Theme mode
-                            ValueListenableBuilder<ThemeMode>(
-                              valueListenable: AppTheme.mode,
-                              builder: (context, mode, _) {
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Theme',
-                                      style: TextStyle(
-                                        color: onSurface.withOpacity(0.75),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Wrap(
-                                      spacing: 8,
-                                      children: [
-                                        ChoiceChip(
-                                          avatar: const Icon(
-                                            Icons.wb_sunny_outlined,
-                                            size: 16,
-                                          ),
-                                          label: Text(
-                                            'Light',
-                                            style: TextStyle(color: onSurface),
-                                          ),
-                                          selected: mode == ThemeMode.light,
-                                          onSelected: (_) =>
-                                              AppTheme.set(ThemeMode.light),
-                                        ),
-                                        ChoiceChip(
-                                          avatar: const Icon(
-                                            Icons.dark_mode_outlined,
-                                            size: 16,
-                                          ),
-                                          label: Text(
-                                            'Dark',
-                                            style: TextStyle(color: onSurface),
-                                          ),
-                                          selected: mode == ThemeMode.dark,
-                                          onSelected: (_) =>
-                                              AppTheme.set(ThemeMode.dark),
-                                        ),
-                                        ChoiceChip(
-                                          avatar: const Icon(
-                                            Icons.phone_iphone,
-                                            size: 16,
-                                          ),
-                                          label: Text(
-                                            'System',
-                                            style: TextStyle(color: onSurface),
-                                          ),
-                                          selected: mode == ThemeMode.system,
-                                          onSelected: (_) =>
-                                              AppTheme.set(ThemeMode.system),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 10),
+                            // Accent colors only (theme mode controls removed)
+                            const SizedBox(height: 4),
                             // Accent colors
                             ValueListenableBuilder<Color>(
                               valueListenable: AppTheme.accent,
@@ -369,6 +313,7 @@ class _AppDrawerState extends State<AppDrawer> {
                                 ];
                                 return Wrap(
                                   spacing: 10,
+                                  runSpacing: 10,
                                   children: options.map((c) {
                                     final selected =
                                         c.toARGB32() == color.toARGB32();

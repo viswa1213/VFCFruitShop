@@ -7,7 +7,7 @@ module.exports = async function auth(req, res, next) {
     const [, token] = header.split(' ');
     if (!token) return res.status(401).json({ message: 'Unauthorized' });
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(payload.id).select('_id name email');
+  const user = await User.findById(payload.id).select('_id name email role');
     if (!user) return res.status(401).json({ message: 'Unauthorized' });
     req.user = user;
     next();

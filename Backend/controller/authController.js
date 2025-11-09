@@ -20,13 +20,20 @@ exports.register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = new User({ name, email, password: hashedPassword });
+    // Auto-assign admin role if email is listed in env ADMIN_EMAILS
+    const admins = (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    const role = admins.includes(email.toLowerCase()) ? 'admin' : 'user';
+
+    const user = new User({ name, email, password: hashedPassword, role });
     await user.save();
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
     console.log("User registered:", user.email);
-    return res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email } });
+  return res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (error) {
     console.error("Registration error:", error);
     return res.status(500).json({ message: "Server error" });
@@ -55,7 +62,17 @@ exports.login = async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
     console.log("User logged in:", email);
-    return res.status(200).json({ token, user: { id: user._id, name: user.name, email: user.email } });
+    // Include role, compute from stored role (and update if env changed)
+    const admins = (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    const shouldBeAdmin = admins.includes(user.email.toLowerCase());
+    if (shouldBeAdmin && user.role !== 'admin') {
+      user.role = 'admin';
+      await user.save();
+    }
+    return res.status(200).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
     console.error("Login error:", err);
     return res.status(500).json({ message: "Server error" });

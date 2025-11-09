@@ -47,6 +47,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   String addressType = 'Home';
   bool saveAddress = true;
   bool setDefaultAddress = true;
+  bool _isLocating = false;
 
   double get subtotal => widget.cartItems.fold<double>(0, (sum, item) {
     final price = (item["price"] as num).toDouble();
@@ -304,8 +305,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _useCurrentLocation() async {
-    if (!await _ensureLocationPermission()) return;
+    if (_isLocating) return;
+    setState(() => _isLocating = true);
     try {
+      if (!await _ensureLocationPermission()) return;
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
       );
@@ -334,6 +337,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
     } catch (e) {
       if (!mounted) return;
       AppSnack.showError(context, 'Failed to get location: $e');
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
     }
   }
 
@@ -730,9 +735,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   spacing: 8,
                   children: [
                     TextButton.icon(
-                      onPressed: _useCurrentLocation,
-                      icon: const Icon(Icons.my_location_outlined, size: 18),
-                      label: const Text('Use current location'),
+                      onPressed: _isLocating ? null : _useCurrentLocation,
+                      icon: _isLocating
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.my_location_outlined, size: 18),
+                      label: Text(
+                        _isLocating ? 'Locating…' : 'Use current location',
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: _pickOnMap,

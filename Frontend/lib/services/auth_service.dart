@@ -117,6 +117,12 @@ class AuthService {
     }
   }
 
+  static Future<bool> isAdmin() async {
+    final user = await getCurrentUser();
+    final role = user?['role']?.toString();
+    return role == 'admin';
+  }
+
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kTokenKey);

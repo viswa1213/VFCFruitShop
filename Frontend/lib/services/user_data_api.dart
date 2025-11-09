@@ -132,4 +132,133 @@ class UserDataApi {
     );
     return resp.statusCode >= 200 && resp.statusCode < 300;
   }
+
+  // =====================
+  // ADMIN API
+  // =====================
+
+  static Future<bool> adminPing() async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.get(_uri('/api/admin/ping'), headers: headers);
+    return resp.statusCode >= 200 && resp.statusCode < 300;
+  }
+
+  static Future<List<Map<String, dynamic>>> adminListProducts({String? category}) async {
+    final headers = await AuthService.authHeaders();
+    final path = category == null
+        ? '/api/admin/products'
+        : '/api/admin/products?category=$category';
+    final resp = await http.get(_uri(path), headers: headers);
+    final code = resp.statusCode;
+    if (code >= 200 && code < 300) {
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final list = (data['products'] as List?) ?? const [];
+      return list.cast<Map>().map((e) => e.cast<String, dynamic>()).toList();
+    }
+    throw Exception('Failed to list products: HTTP $code');
+  }
+
+  static Future<Map<String, dynamic>> adminCreateProduct(Map<String, dynamic> product) async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.post(
+      _uri('/api/admin/products'),
+      headers: headers,
+      body: jsonEncode(product),
+    );
+    final code = resp.statusCode;
+    if (code == 201 || (code >= 200 && code < 300)) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Create product failed: HTTP $code ${resp.body}');
+  }
+
+  static Future<Map<String, dynamic>> adminUpdateProduct(String id, Map<String, dynamic> patch) async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.put(
+      _uri('/api/admin/products/$id'),
+      headers: headers,
+      body: jsonEncode(patch),
+    );
+    final code = resp.statusCode;
+    if (code >= 200 && code < 300) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Update product failed: HTTP $code ${resp.body}');
+  }
+
+  static Future<Map<String, dynamic>> adminUploadProductImage(String id, List<int> bytes, {String filename = 'image.jpg'}) async {
+    final headers = await AuthService.authHeaders();
+    final uri = _uri('/api/admin/products/$id/image');
+    final request = http.MultipartRequest('POST', uri);
+    headers.forEach((k, v) => request.headers[k] = v);
+    request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: filename));
+    final streamed = await request.send();
+    final respBody = await streamed.stream.bytesToString();
+    if (streamed.statusCode >= 200 && streamed.statusCode < 300) {
+      return jsonDecode(respBody) as Map<String, dynamic>;
+    }
+    throw Exception('Image upload failed: HTTP ${streamed.statusCode} $respBody');
+  }
+
+  static Future<bool> adminDeleteProduct(String id) async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.delete(_uri('/api/admin/products/$id'), headers: headers);
+    return resp.statusCode >= 200 && resp.statusCode < 300;
+  }
+
+  static Future<List<Map<String, dynamic>>> adminListOrders() async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.get(_uri('/api/admin/orders'), headers: headers);
+    final code = resp.statusCode;
+    if (code >= 200 && code < 300) {
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final list = (data['orders'] as List?) ?? const [];
+      return list.cast<Map>().map((e) => e.cast<String, dynamic>()).toList();
+    }
+    throw Exception('Failed to list orders: HTTP $code');
+  }
+
+  static Future<bool> adminUpdateOrderStatus(String id, String status) async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.patch(
+      _uri('/api/admin/orders/$id/status'),
+      headers: headers,
+      body: jsonEncode({'status': status}),
+    );
+    return resp.statusCode >= 200 && resp.statusCode < 300;
+  }
+
+  static Future<List<Map<String, dynamic>>> adminListUsers() async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.get(_uri('/api/admin/users'), headers: headers);
+    final code = resp.statusCode;
+    if (code >= 200 && code < 300) {
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final list = (data['users'] as List?) ?? const [];
+      return list.cast<Map>().map((e) => e.cast<String, dynamic>()).toList();
+    }
+    throw Exception('Failed to list users: HTTP $code');
+  }
+
+  static Future<Map<String, dynamic>> adminGetUser(String id) async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.get(_uri('/api/admin/users/$id'), headers: headers);
+    final code = resp.statusCode;
+    if (code >= 200 && code < 300) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to get user: HTTP $code');
+  }
+
+  static Future<bool> adminUpdateUserRole(String id, String role) async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.patch(
+      _uri('/api/admin/users/$id/role'),
+      headers: headers,
+      body: jsonEncode({ 'role': role }),
+    );
+    return resp.statusCode >= 200 && resp.statusCode < 300;
+  }
+
+  // ----------------- END ADMIN ENDPOINTS -----------------
 }

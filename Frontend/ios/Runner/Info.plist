@@ -49,5 +49,8 @@
 	<string>This app uses your location to suggest accurate delivery address.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Location access helps us find your address on the map.</string>
+	<!-- Google Maps iOS SDK API Key (set your key here) -->
+	<key>GMSApiKey</key>
+	<string>YOUR_IOS_MAPS_API_KEY</string>
 </dict>
 </plist>

@@ -8,7 +8,10 @@ import 'package:fruit_shop/widgets/app_snackbar.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, String> userData;
-  const ProfilePage({super.key, required this.userData});
+  // Callback provided by Home so we can open the real live cart (with current items)
+  // instead of constructing an empty cart locally. If null we fall back to an empty cart page.
+  final VoidCallback? openCart;
+  const ProfilePage({super.key, required this.userData, this.openCart});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -360,12 +363,22 @@ class _ProfilePageState extends State<ProfilePage>
                       Row(
                         children: [
                           ElevatedButton.icon(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CartPage(cartItems: const []),
-                              ),
-                            ),
+                            onPressed: () {
+                              // If we have a cart opener from Home, pop Profile then open cart with real items.
+                              if (widget.openCart != null) {
+                                Navigator.pop(context); // close Profile
+                                widget.openCart!();
+                              } else {
+                                // Fallback: open an empty cart (legacy behavior)
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        CartPage(cartItems: const []),
+                                  ),
+                                );
+                              }
+                            },
                             icon: const Icon(Icons.shopping_cart, size: 18),
                             label: const Text('View Cart'),
                             style: ElevatedButton.styleFrom(

@@ -21,6 +21,8 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     // Top-level phone added so profile can store primary mobile separate from address.phone
     phone: { type: String, match: [/^\d{10,15}$/u, 'Phone must be 10-15 digits'] },
+    // Simple role-based access control: 'user' | 'admin'
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
     cart: { type: [cartItemSchema], default: [] },
     favorites: { type: [String], default: [] },
     address: { type: addressSchema, default: {} },

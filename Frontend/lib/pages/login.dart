@@ -84,11 +84,17 @@ class _LoginPageState extends State<LoginPage>
           context,
           'Welcome back, ${user['name']?.toString() ?? 'User'}!',
         );
-        final args = <String, String>{
-          'name': (user['name'] ?? 'User').toString(),
-          'email': (user['email'] ?? email).toString(),
-        };
-        Navigator.pushReplacementNamed(context, '/home', arguments: args);
+        // If admin, send to admin dashboard; else go to home
+        final role = (user['role'] ?? '').toString();
+        if (role == 'admin') {
+          Navigator.pushReplacementNamed(context, '/admin');
+        } else {
+          final args = <String, String>{
+            'name': (user['name'] ?? 'User').toString(),
+            'email': (user['email'] ?? email).toString(),
+          };
+          Navigator.pushReplacementNamed(context, '/home', arguments: args);
+        }
       } else {
         if (!mounted) return;
         final msg = result['message'] ?? 'Invalid credentials';

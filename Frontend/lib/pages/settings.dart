@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fruit_shop/services/app_theme.dart';
-import 'package:fruit_shop/services/ui_colors.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -72,10 +71,9 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: UiColors.textPrimary(context),
                 ),
               ),
             ],
@@ -85,6 +83,7 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
+  // Appearance section (accent picker only; no theme mode controls)
   Widget _appearanceCard(BuildContext context) {
     return _animatedCard(
       0,
@@ -104,51 +103,20 @@ class SettingsPage extends StatelessWidget {
                   'Appearance',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: UiColors.textPrimary(context),
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            Text('Theme', style: TextStyle(color: UiColors.textSecondary(context))),
-            const SizedBox(height: 6),
-            ValueListenableBuilder<ThemeMode>(
-              valueListenable: AppTheme.mode,
-              builder: (context, mode, _) {
-                final entries = [
-                  {
-                    'label': 'Light',
-                    'mode': ThemeMode.light,
-                    'icon': Icons.wb_sunny_outlined,
-                  },
-                  {
-                    'label': 'Dark',
-                    'mode': ThemeMode.dark,
-                    'icon': Icons.dark_mode_outlined,
-                  },
-                  {
-                    'label': 'System',
-                    'mode': ThemeMode.system,
-                    'icon': Icons.phone_iphone,
-                  },
-                ];
-                return Wrap(
-                  spacing: 8,
-                  children: entries.asMap().entries.map((e) {
-                    final selected = mode == e.value['mode'];
-                    return ChoiceChip(
-                      avatar: Icon(e.value['icon'] as IconData, size: 16),
-                      label: Text(e.value['label'] as String),
-                      selected: selected,
-                      onSelected: (_) =>
-                          AppTheme.set(e.value['mode'] as ThemeMode),
-                    );
-                  }).toList(),
-                );
-              },
+            Text(
+              'Accent color',
+              style: TextStyle(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withOpacity(0.75),
+              ),
             ),
-            const SizedBox(height: 10),
-            Text('Accent color', style: TextStyle(color: UiColors.textSecondary(context))),
             const SizedBox(height: 8),
             ValueListenableBuilder<Color>(
               valueListenable: AppTheme.accent,
@@ -175,6 +143,7 @@ class SettingsPage extends StatelessWidget {
                 ];
                 return Wrap(
                   spacing: 10,
+                  runSpacing: 10,
                   children: options.map((c) {
                     final selected = c.toARGB32() == color.toARGB32();
                     return GestureDetector(
@@ -195,12 +164,9 @@ class SettingsPage extends StatelessWidget {
                                 ]
                               : null,
                           border: Border.all(
-              color: selected
-                ? Theme.of(context).colorScheme.onSurface
-                : Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withOpacity(0.12),
+                            color: selected
+                                ? Colors.white
+                                : Theme.of(context).dividerColor,
                             width: 2,
                           ),
                         ),

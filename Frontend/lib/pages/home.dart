@@ -8,7 +8,6 @@ import 'package:fruit_shop/pages/orders.dart';
 import 'package:fruit_shop/widgets/app_drawer.dart';
 import 'package:fruit_shop/pages/settings.dart';
 import 'package:fruit_shop/widgets/app_snackbar.dart';
-import 'package:fruit_shop/services/app_theme.dart';
 import 'package:fruit_shop/services/favorites_storage.dart';
 import 'package:fruit_shop/services/user_data_api.dart';
 import 'package:fruit_shop/services/auth_service.dart';
@@ -714,7 +713,7 @@ class _HomePageState extends State<HomePage>
                                 : Colors.white,
                             foregroundColor: isSelected
                                 ? Colors.white
-                                : Theme.of(context).colorScheme.onSurface,
+                                : Colors.black87,
                             side: BorderSide(
                               color: isSelected
                                   ? Theme.of(context).colorScheme.primary
@@ -811,19 +810,7 @@ class _HomePageState extends State<HomePage>
   Widget _cartIconWithBadge() {
     return Stack(
       children: [
-        IconButton(
-          icon: const Icon(Icons.shopping_cart),
-          onPressed: () async {
-            final updated = await Navigator.push<List<Map<String, dynamic>>>(
-              context,
-              MaterialPageRoute(builder: (_) => CartPage(cartItems: cart)),
-            );
-            if (updated != null) {
-              setState(() => cart = updated);
-              _scheduleCartSync();
-            }
-          },
-        ),
+        IconButton(icon: const Icon(Icons.shopping_cart), onPressed: _openCart),
         if (cart.isNotEmpty)
           Positioned(
             right: 8,
@@ -843,6 +830,17 @@ class _HomePageState extends State<HomePage>
           ),
       ],
     );
+  }
+
+  Future<void> _openCart() async {
+    final updated = await Navigator.push<List<Map<String, dynamic>>>(
+      context,
+      MaterialPageRoute(builder: (_) => CartPage(cartItems: cart)),
+    );
+    if (updated != null) {
+      setState(() => cart = updated);
+      _scheduleCartSync();
+    }
   }
 
   // Drawer moved to a reusable widget: AppDrawer
@@ -893,7 +891,7 @@ class _HomePageState extends State<HomePage>
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+                                        Colors.black.withValues(alpha: 0.15),
                                         Colors.transparent,
                                       ],
                                       begin: Alignment.bottomCenter,
@@ -910,7 +908,7 @@ class _HomePageState extends State<HomePage>
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.onSurface.withValues(
+                                      color: Colors.black.withValues(
                                         alpha: 0.35,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -1120,15 +1118,10 @@ class _HomePageState extends State<HomePage>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
+                            const Expanded(
                               child: Text(
                                 'From everyday staples to seasonal favorites, VFC is your go-to for better fruit—delivered.',
-                                style: TextStyle(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface
-                                      .withOpacity(0.70),
-                                ),
+                                style: TextStyle(color: Colors.black54),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1290,22 +1283,18 @@ class _HomePageState extends State<HomePage>
                     children: [
                       Text(
                         '₹${price.round()}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(width: 8),
                       if (original != null)
                         Text(
                           '₹$original',
-                          style: TextStyle(
+                          style: const TextStyle(
                             decoration: TextDecoration.lineThrough,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.38),
+                            color: Colors.black38,
                           ),
                         ),
                     ],
@@ -1516,12 +1505,9 @@ class _HomePageState extends State<HomePage>
                                   const SizedBox(width: 2),
                                   Text(
                                     (fruit['rating'] as num).toStringAsFixed(1),
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 12,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withOpacity(0.70),
+                                      color: Colors.black54,
                                     ),
                                   ),
                                 ],
@@ -1727,12 +1713,9 @@ class _HomePageState extends State<HomePage>
                                       ((fruit['rating'] as num?)?.toDouble() ??
                                               0)
                                           .toStringAsFixed(1),
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontSize: 12,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withOpacity(0.70),
+                                        color: Colors.black54,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -1778,13 +1761,10 @@ class _HomePageState extends State<HomePage>
                                         if (original != null)
                                           Text(
                                             '₹$original',
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                               decoration:
                                                   TextDecoration.lineThrough,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withOpacity(0.38),
+                                              color: Colors.black38,
                                               fontSize: 12,
                                             ),
                                           ),
@@ -2055,10 +2035,7 @@ class _HomePageState extends State<HomePage>
         onOpenHome: () => Navigator.pop(context),
         onOpenCart: () {
           Navigator.pop(context);
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => CartPage(cartItems: cart)),
-          );
+          _openCart();
         },
         onOpenFavorites: () {
           Navigator.pop(context);
@@ -2069,7 +2046,8 @@ class _HomePageState extends State<HomePage>
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ProfilePage(userData: widget.userData),
+              builder: (_) =>
+                  ProfilePage(userData: widget.userData, openCart: _openCart),
             ),
           );
         },
@@ -2119,7 +2097,7 @@ class _HomePageState extends State<HomePage>
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         title: const Text(
-          'Fruit Shop',
+          'Fruizo by VFC',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.transparent,
@@ -2139,17 +2117,6 @@ class _HomePageState extends State<HomePage>
           },
         ),
         actions: [
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: AppTheme.mode,
-            builder: (context, mode, _) {
-              final isDark = mode == ThemeMode.dark;
-              return IconButton(
-                tooltip: isDark ? 'Light mode' : 'Dark mode',
-                icon: Icon(isDark ? Icons.wb_sunny : Icons.dark_mode),
-                onPressed: AppTheme.toggle,
-              );
-            },
-          ),
           IconButton(
             tooltip: 'Filter & Sort',
             icon: const Icon(Icons.tune),
@@ -2166,7 +2133,8 @@ class _HomePageState extends State<HomePage>
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ProfilePage(userData: widget.userData),
+                builder: (_) =>
+                    ProfilePage(userData: widget.userData, openCart: _openCart),
               ),
             );
             return;

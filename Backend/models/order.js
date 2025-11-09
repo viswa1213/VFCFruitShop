@@ -34,6 +34,7 @@ const orderSchema = new mongoose.Schema(
       cardLast4: String,
     },
     address: { type: addressSchema, default: {} },
+    status: { type: String, enum: ['processing', 'shipped', 'delivered'], default: 'processing' },
   },
   { timestamps: true }
 );

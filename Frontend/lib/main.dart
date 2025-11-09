@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:fruit_shop/pages/home.dart';
 import 'package:fruit_shop/pages/login.dart';
+import 'package:fruit_shop/pages/admin_dashboard.dart';
 import 'package:fruit_shop/pages/register.dart';
 import 'package:fruit_shop/services/app_theme.dart';
 import 'package:fruit_shop/pages/settings.dart';
@@ -137,6 +138,7 @@ class MyApp extends StatelessWidget {
                   return HomePage(userData: userData);
                 },
                 '/settings': (context) => const SettingsPage(),
+                '/admin': (context) => const AdminDashboardPage(),
               },
             );
           },
