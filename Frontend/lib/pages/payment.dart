@@ -132,12 +132,15 @@ class _PaymentPageState extends State<PaymentPage> {
                 ),
               ),
               SizedBox(height: responsive.spacing(8, 12)),
-              Text(
-                "₹${widget.totalAmount.toStringAsFixed(2)}",
-                style: TextStyle(
-                  fontSize: responsive.fontSize(32, 36),
-                  fontWeight: FontWeight.w900,
-                  color: primary,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "₹${widget.totalAmount.toStringAsFixed(2)}",
+                  style: TextStyle(
+                    fontSize: responsive.fontSize(32, 36),
+                    fontWeight: FontWeight.w900,
+                    color: primary,
+                  ),
                 ),
               ),
             ],
@@ -196,10 +199,15 @@ class _PaymentPageState extends State<PaymentPage> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey.shade200),
               ),
-              child: Image.asset(
-                "assets/images/QR.jpeg",
-                height: responsive.isMobile ? 200 : 250,
-                width: responsive.isMobile ? 200 : 250,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: responsive.isMobile ? 200 : 250,
+                  maxHeight: responsive.isMobile ? 200 : 250,
+                ),
+                child: Image.asset(
+                  "assets/images/QR.jpeg",
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
             SizedBox(height: responsive.spacing(16, 20)),

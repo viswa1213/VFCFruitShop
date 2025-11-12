@@ -445,6 +445,8 @@ class _ProfilePageState extends State<ProfilePage>
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(width: 8),
                           Container(
@@ -471,6 +473,8 @@ class _ProfilePageState extends State<ProfilePage>
                       Text(
                         email,
                         style: const TextStyle(color: Colors.white70),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 10),
                       Row(

@@ -40,6 +40,8 @@ class OrderDetailsPage extends StatelessWidget {
             fontSize: responsive.fontSize(20, 22),
             fontWeight: FontWeight.w800,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
           Material(
@@ -293,6 +295,15 @@ class OrderDetailsPage extends StatelessWidget {
                             child: const Icon(Icons.shopping_bag),
                           ),
                   ),
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: responsive.fontSize(14, 16),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   SizedBox(width: responsive.spacing(16, 20)),
                   Expanded(
                     child: Column(
@@ -316,12 +327,15 @@ class OrderDetailsPage extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Text(
-                    '₹${line.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: responsive.fontSize(16, 18),
-                      color: primary,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '₹${line.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: responsive.fontSize(16, 18),
+                        color: primary,
+                      ),
                     ),
                   ),
                 ],

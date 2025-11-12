@@ -1137,20 +1137,20 @@ class _HomePageState extends State<HomePage>
     return FadeInSlide(
       offset: const Offset(0, 30),
       duration: const Duration(milliseconds: 800),
-            child: Padding(
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-                    colors: [
+              colors: [
                 primary,
                 primary.withValues(alpha: 0.8),
                 primary.withValues(alpha: 0.6),
-                    ],
+              ],
               stops: const [0.0, 0.5, 1.0],
-                  ),
+            ),
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -1160,18 +1160,18 @@ class _HomePageState extends State<HomePage>
                 spreadRadius: 2,
               ),
             ],
-                ),
-                child: Container(
+          ),
+          child: Container(
             margin: const EdgeInsets.all(3.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
+            decoration: BoxDecoration(
+              color: Colors.white,
               borderRadius: BorderRadius.circular(21),
-                  ),
-                  child: Padding(
+            ),
+            child: Padding(
               padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   // Header with animated logo
                   _buildAnimatedHeader(primary),
                   const SizedBox(height: 16),
@@ -1208,7 +1208,7 @@ class _HomePageState extends State<HomePage>
           child: Opacity(
             opacity: clampedValue,
             child: Row(
-                          children: [
+              children: [
                 Container(
                   width: 50,
                   height: 50,
@@ -1229,24 +1229,24 @@ class _HomePageState extends State<HomePage>
                   ),
                   child: Center(
                     child: Text(
-                                'VFC',
+                      'VFC',
                       style: const TextStyle(
-                                  color: Colors.white,
+                        color: Colors.white,
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
                         letterSpacing: 1,
-                                ),
-                              ),
-                            ),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                            Text(
-                              'About VFC',
-                              style: TextStyle(
+                      Text(
+                        'About VFC',
+                        style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w900,
                           color: primary,
@@ -1262,10 +1262,10 @@ class _HomePageState extends State<HomePage>
                             colors: [primary, primary.withValues(alpha: 0.3)],
                           ),
                           borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ],
                         ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1286,7 +1286,7 @@ class _HomePageState extends State<HomePage>
           child: Transform.translate(
             offset: Offset(0, 10 * (1 - value)),
             child: Text(
-                          'VFC brings you farm-fresh fruits with uncompromising quality. We partner directly with trusted growers so you enjoy peak-season taste, transparent sourcing, and fair prices.',
+              'VFC brings you farm-fresh fruits with uncompromising quality. We partner directly with trusted growers so you enjoy peak-season taste, transparent sourcing, and fair prices.',
               style: TextStyle(
                 height: 1.5,
                 fontSize: 14,
@@ -1347,12 +1347,12 @@ class _HomePageState extends State<HomePage>
                 color: color.withValues(alpha: 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
+              ),
+            ],
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-                          children: [
+            children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -1360,8 +1360,8 @@ class _HomePageState extends State<HomePage>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 20),
-                            ),
-                            const SizedBox(width: 12),
+              ),
+              const SizedBox(width: 12),
               Flexible(
                 child: Text(
                   text,
@@ -1461,25 +1461,25 @@ class _HomePageState extends State<HomePage>
               },
               borderRadius: BorderRadius.circular(14),
               child: Container(
-                                padding: const EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 14,
-                                ),
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [primary, primary.withValues(alpha: 0.8)],
-                                ),
+                  ),
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
                       color: primary.withValues(alpha: 0.4),
                       blurRadius: 12,
                       offset: const Offset(0, 6),
-                        ),
-                      ],
                     ),
+                  ],
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1637,11 +1637,14 @@ class _HomePageState extends State<HomePage>
                 children: [
                   Row(
                     children: [
-                      Text(
-                        '₹${price.round()}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '₹${price.round()}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1671,10 +1674,13 @@ class _HomePageState extends State<HomePage>
                       Icons.add_shopping_cart,
                       color: Theme.of(context).colorScheme.primary,
                     ),
-                    label: Text(
-                      'Add to cart',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Add to cart',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                     ),
                   ),
@@ -1949,11 +1955,11 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildEnhancedProductCard(Map<String, dynamic> fruit, int index) {
-          final theme = Theme.of(context);
-          final name = fruit['name'] as String;
-          final isFav = favorites.contains(name);
-          final discount = (fruit['discount'] as num?)?.toInt() ?? 0;
-          final price = (fruit['price'] as num?)?.toDouble() ?? 0;
+    final theme = Theme.of(context);
+    final name = fruit['name'] as String;
+    final isFav = favorites.contains(name);
+    final discount = (fruit['discount'] as num?)?.toInt() ?? 0;
+    final price = (fruit['price'] as num?)?.toDouble() ?? 0;
     final rating = (fruit['rating'] as num?)?.toDouble() ?? 0.0;
     final sold = (fruit['sold'] as num?)?.toInt() ?? 0;
     final stock = (fruit['stock'] as num?)?.toInt() ?? 0;
@@ -1961,27 +1967,27 @@ class _HomePageState extends State<HomePage>
     final isHovered = _hovered.contains('grid-$name');
     final isPressed = _pressed.contains('grid-$name');
 
-          final priceLabel = price.truncateToDouble() == price
-              ? price.toInt().toString()
-              : price.toStringAsFixed(2);
-          final double? originalValue = discount > 0
-              ? price / (1 - (discount / 100))
-              : null;
-          final String? originalLabel = originalValue == null
-              ? null
-              : (originalValue.truncateToDouble() == originalValue
-                    ? originalValue.toInt().toString()
-                    : originalValue.toStringAsFixed(2));
+    final priceLabel = price.truncateToDouble() == price
+        ? price.toInt().toString()
+        : price.toStringAsFixed(2);
+    final double? originalValue = discount > 0
+        ? price / (1 - (discount / 100))
+        : null;
+    final String? originalLabel = originalValue == null
+        ? null
+        : (originalValue.truncateToDouble() == originalValue
+              ? originalValue.toInt().toString()
+              : originalValue.toStringAsFixed(2));
 
-          return MouseRegion(
+    return MouseRegion(
       onEnter: (_) => setState(() => _hovered.add('grid-$name')),
       onExit: (_) => setState(() => _hovered.remove('grid-$name')),
-            child: GestureDetector(
+      child: GestureDetector(
         onTapDown: (_) => setState(() => _pressed.add('grid-$name')),
         onTapUp: (_) => setState(() => _pressed.remove('grid-$name')),
         onTapCancel: () => setState(() => _pressed.remove('grid-$name')),
-              onTap: () => _openProductSheet(fruit),
-              child: AnimatedScale(
+        onTap: () => _openProductSheet(fruit),
+        child: AnimatedScale(
           scale: isHovered || isPressed ? 1.02 : 1.0,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
@@ -2014,35 +2020,35 @@ class _HomePageState extends State<HomePage>
               child: Card(
                 elevation: 0,
                 margin: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                   side: isFeatured
-                            ? BorderSide(
-                                color: theme.colorScheme.secondary.withValues(
+                      ? BorderSide(
+                          color: theme.colorScheme.secondary.withValues(
                             alpha: 0.5,
-                                ),
+                          ),
                           width: 1.5,
-                              )
+                        )
                       : BorderSide(
                           color: Colors.grey.withValues(alpha: 0.1),
                           width: 1,
                         ),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                  children: [
                     // Image Section
-                          Expanded(
+                    Expanded(
                       flex: 3,
-                            child: Stack(
+                      child: Stack(
                         fit: StackFit.expand,
-                              children: [
+                        children: [
                           // Product Image
                           Hero(
-                                    tag: 'img-$name',
-                                    child: _buildProductImage(
-                                      fruit['image']?.toString(),
+                            tag: 'img-$name',
+                            child: _buildProductImage(
+                              fruit['image']?.toString(),
                               fit: BoxFit.cover,
                             ),
                           ),
@@ -2059,21 +2065,21 @@ class _HomePageState extends State<HomePage>
                                       Colors.black.withValues(alpha: 0.15),
                                     ],
                                   ),
-                                    ),
-                                  ),
                                 ),
+                              ),
+                            ),
                           // Discount Badge
-                                if (discount > 0)
-                                  Positioned(
+                          if (discount > 0)
+                            Positioned(
                               top: 12,
                               left: 12,
                               child: PulseAnimation(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
                                     vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
+                                  ),
+                                  decoration: BoxDecoration(
                                     gradient: const LinearGradient(
                                       colors: [
                                         Color(0xFFE91E63),
@@ -2090,7 +2096,7 @@ class _HomePageState extends State<HomePage>
                                         offset: const Offset(0, 2),
                                       ),
                                     ],
-                                      ),
+                                  ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -2109,18 +2115,18 @@ class _HomePageState extends State<HomePage>
                                         ),
                                       ),
                                     ],
-                                    ),
                                   ),
+                                ),
                               ),
                             ),
                           // Favorite Button
-                                Positioned(
+                          Positioned(
                             top: 12,
                             right: 12,
                             child: Material(
                               color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () => toggleFavorite(fruit),
+                              child: InkWell(
+                                onTap: () => toggleFavorite(fruit),
                                 borderRadius: BorderRadius.circular(20),
                                 child: Container(
                                   padding: const EdgeInsets.all(8),
@@ -2137,7 +2143,7 @@ class _HomePageState extends State<HomePage>
                                       ),
                                     ],
                                   ),
-                                      child: AnimatedSwitcher(
+                                  child: AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 200),
                                     transitionBuilder: (child, animation) {
                                       return ScaleTransition(
@@ -2145,28 +2151,28 @@ class _HomePageState extends State<HomePage>
                                         child: child,
                                       );
                                     },
-                                        child: Icon(
-                                          isFav
-                                              ? Icons.favorite
-                                              : Icons.favorite_border,
-                                          key: ValueKey<bool>(isFav),
-                                          color: isFav
-                                              ? Colors.pink
+                                    child: Icon(
+                                      isFav
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      key: ValueKey<bool>(isFav),
+                                      color: isFav
+                                          ? Colors.pink
                                           : Colors.grey.shade600,
                                       size: 20,
-                                        ),
-                                      ),
                                     ),
                                   ),
                                 ),
+                              ),
+                            ),
                           ),
                           // Featured Badge
                           if (isFeatured)
-                                  Positioned(
+                            Positioned(
                               bottom: 12,
                               right: 12,
-                                    child: _featuredBadgeMini(),
-                                  ),
+                              child: _featuredBadgeMini(),
+                            ),
                           // Stock Indicator
                           if (stock > 0 && stock < 10)
                             Positioned(
@@ -2191,35 +2197,35 @@ class _HomePageState extends State<HomePage>
                                 ),
                               ),
                             ),
-                              ],
-                            ),
-                          ),
+                        ],
+                      ),
+                    ),
                     // Product Info Section
                     Expanded(
                       flex: 2,
                       child: Padding(
-                            padding: const EdgeInsets.symmetric(
+                        padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                              vertical: 10,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          vertical: 10,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
-                              children: [
+                          children: [
                             // Product Name
-                                Text(
-                                  name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 14,
-                                    fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w700,
                                 color: theme.colorScheme.onSurface,
                                 letterSpacing: -0.3,
                                 height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
                             // Rating and Category Row
                             Row(
                               children: [
@@ -2235,12 +2241,12 @@ class _HomePageState extends State<HomePage>
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
+                                      children: [
+                                        Icon(
                                           Icons.star_rounded,
                                           size: 12,
                                           color: Colors.amber.shade700,
-                                    ),
+                                        ),
                                         const SizedBox(width: 2),
                                         Flexible(
                                           child: Text(
@@ -2249,9 +2255,9 @@ class _HomePageState extends State<HomePage>
                                               fontSize: 10,
                                               fontWeight: FontWeight.w600,
                                               color: Colors.amber.shade900,
-                                      ),
+                                            ),
                                             overflow: TextOverflow.ellipsis,
-                                    ),
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -2290,26 +2296,26 @@ class _HomePageState extends State<HomePage>
                                     ),
                                     decoration: BoxDecoration(
                                       color: theme.colorScheme.primary
-                                            .withValues(alpha: 0.1),
+                                          .withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(5),
-                                      ),
-                                      child: Text(
-                                        fruit['category']?.toString() ?? '',
-                                        style: TextStyle(
+                                    ),
+                                    child: Text(
+                                      fruit['category']?.toString() ?? '',
+                                      style: TextStyle(
                                         fontSize: 9,
                                         color: theme.colorScheme.primary,
-                                          fontWeight: FontWeight.w600,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                       maxLines: 1,
-                                        ),
-                                      ),
                                     ),
-                                  ],
+                                  ),
                                 ),
+                              ],
+                            ),
                             const Spacer(),
                             // Price and Add Button Row
-                                Row(
+                            Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
@@ -2318,15 +2324,15 @@ class _HomePageState extends State<HomePage>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
+                                    children: [
+                                      Row(
                                         mainAxisSize: MainAxisSize.min,
-                                      children: [
+                                        children: [
                                           Flexible(
                                             child: Text(
-                                          '₹$priceLabel',
+                                              '₹$priceLabel',
                                               style: TextStyle(
-                                            fontWeight: FontWeight.w800,
+                                                fontWeight: FontWeight.w800,
                                                 fontSize: 16,
                                                 color:
                                                     theme.colorScheme.primary,
@@ -2364,9 +2370,9 @@ class _HomePageState extends State<HomePage>
                                           ),
                                         ),
                                     ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
                                 Material(
                                   color: theme.colorScheme.primary,
                                   borderRadius: BorderRadius.circular(10),
@@ -2558,17 +2564,17 @@ class _HomePageState extends State<HomePage>
                       ],
                     ),
                     const SizedBox(height: 8),
-                                          Text(
+                    Text(
                       label,
-                                            style: const TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
-                                              fontSize: 12,
-                                            ),
+                        fontSize: 12,
+                      ),
                       textAlign: TextAlign.center,
-                                          ),
-                                      ],
-                                    ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -2612,9 +2618,9 @@ class _HomePageState extends State<HomePage>
                 );
               },
             ),
-                                    ),
-                                  ],
-                                ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2655,9 +2661,9 @@ class _HomePageState extends State<HomePage>
                   color: Colors.red.withValues(alpha: isHovered ? 0.25 : 0.15),
                   blurRadius: isHovered ? 20 : 15,
                   offset: Offset(0, isHovered ? 12 : 8),
-                          ),
-                        ],
-                      ),
+                ),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2747,10 +2753,10 @@ class _HomePageState extends State<HomePage>
                 ),
               ],
             ),
-                ),
-              ),
-            ),
-          );
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildTrendingSection() {
@@ -2978,7 +2984,7 @@ class _HomePageState extends State<HomePage>
             FadeInSlide(
               offset: const Offset(0, -20),
               child: Padding(
-              padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(16.0),
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
@@ -2990,18 +2996,18 @@ class _HomePageState extends State<HomePage>
                       ),
                     ],
                   ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: _filterFruits,
-                decoration: InputDecoration(
-                  hintText: 'Search products...',
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _filterFruits,
+                    decoration: InputDecoration(
+                      hintText: 'Search products...',
                       prefixIcon: Icon(
                         Icons.search,
                         color: Theme.of(context).colorScheme.primary,
                       ),
-                  filled: true,
+                      filled: true,
                       fillColor: Colors.white,
-                  border: OutlineInputBorder(
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide(
                           color: Theme.of(

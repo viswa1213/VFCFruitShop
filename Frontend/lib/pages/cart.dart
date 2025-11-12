@@ -383,12 +383,15 @@ class _CartPageState extends State<CartPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          "₹${itemTotal.toStringAsFixed(2)}",
-                          style: TextStyle(
-                            fontSize: responsive.fontSize(18, 20),
-                            fontWeight: FontWeight.w800,
-                            color: primary,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            "₹${itemTotal.toStringAsFixed(2)}",
+                            style: TextStyle(
+                              fontSize: responsive.fontSize(18, 20),
+                              fontWeight: FontWeight.w800,
+                              color: primary,
+                            ),
                           ),
                         ),
                         _quantityControls(context, id, qty),
@@ -432,11 +435,14 @@ class _CartPageState extends State<CartPage> {
                   color: Colors.grey.shade700,
                 ),
               ),
-              Text(
-                "₹${total.toStringAsFixed(2)}",
-                style: TextStyle(
-                  fontSize: responsive.fontSize(15, 17),
-                  fontWeight: FontWeight.w600,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "₹${total.toStringAsFixed(2)}",
+                  style: TextStyle(
+                    fontSize: responsive.fontSize(15, 17),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -475,12 +481,15 @@ class _CartPageState extends State<CartPage> {
                   color: Colors.grey.shade900,
                 ),
               ),
-              Text(
-                "₹${(total + 2).toStringAsFixed(2)}",
-                style: TextStyle(
-                  fontSize: responsive.fontSize(20, 24),
-                  fontWeight: FontWeight.w800,
-                  color: primary,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "₹${(total + 2).toStringAsFixed(2)}",
+                  style: TextStyle(
+                    fontSize: responsive.fontSize(20, 24),
+                    fontWeight: FontWeight.w800,
+                    color: primary,
+                  ),
                 ),
               ),
             ],
@@ -535,13 +544,16 @@ class _CartPageState extends State<CartPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      "Proceed to Checkout",
-                      style: TextStyle(
-                        fontSize: responsive.fontSize(16, 18),
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        "Proceed to Checkout",
+                        style: TextStyle(
+                          fontSize: responsive.fontSize(16, 18),
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),

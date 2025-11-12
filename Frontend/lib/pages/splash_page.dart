@@ -33,9 +33,8 @@ class _SplashPageState extends State<SplashPage>
     _scaleAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutBack);
     _animCtrl.forward();
 
-    // Start a background check to precache the logo asset so we can report
-    // a diagnostic if it fails to load (useful when assets aren't picked up).
-    _checkLogoAsset();
+    // animation is started here; asset precache needs widget bindings to be
+    // ready, so we do that in didChangeDependencies below.
 
     // Show the splash briefly then decide where to go.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -77,6 +76,17 @@ class _SplashPageState extends State<SplashPage>
       setState(() => _logoLoaded = false);
       // Keep the error silent in release builds; in debug we print to console.
       if (kDebugMode) debugPrint('Splash: failed to precache vfc_logo.png: $e');
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Safe place to use [context] and inherited widgets for precaching.
+    if (_logoLoaded == null) {
+      // start the async precache but don't await here to avoid blocking
+      // the splash appearance.
+      _checkLogoAsset();
     }
   }
 

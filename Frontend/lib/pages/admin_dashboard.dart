@@ -158,6 +158,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                           ?.copyWith(
                                             fontWeight: FontWeight.w700,
                                           ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
@@ -167,6 +169,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                             color: theme.colorScheme.onSurface
                                                 .withValues(alpha: 0.7),
                                           ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
