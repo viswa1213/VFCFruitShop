@@ -207,6 +207,8 @@ class _OrdersPageState extends State<OrdersPage> {
                       fontWeight: FontWeight.w800,
                       fontSize: responsive.fontSize(16, 18),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -215,6 +217,8 @@ class _OrdersPageState extends State<OrdersPage> {
                       fontSize: responsive.fontSize(12, 14),
                       color: Colors.grey.shade600,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -244,6 +248,8 @@ class _OrdersPageState extends State<OrdersPage> {
                     color: Colors.grey.shade700,
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -253,12 +259,15 @@ class _OrdersPageState extends State<OrdersPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              '₹${total.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: responsive.fontSize(18, 20),
-                color: primary,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '₹${total.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: responsive.fontSize(18, 20),
+                  color: primary,
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -319,6 +328,8 @@ class _OrdersPageState extends State<OrdersPage> {
                             fontWeight: FontWeight.w700,
                             fontSize: responsive.fontSize(14, 16),
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Text(
