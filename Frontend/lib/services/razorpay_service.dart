@@ -52,6 +52,10 @@ class RazorpayService {
     }
 
     void onError(PaymentFailureResponse r) {
+      // Log for debugging, then normalize the error into a Map
+      debugPrint(
+        '[Razorpay] payment error code=${r.code} message=${r.message}',
+      );
       if (!completer.isCompleted) {
         completer.completeError({
           'status': 'error',
@@ -72,8 +76,8 @@ class RazorpayService {
       ..on(Razorpay.EVENT_EXTERNAL_WALLET, onExternalWallet);
 
     final primary = Theme.of(context).colorScheme.primary;
-    // Extract RGB from ARGB integer to avoid deprecated color channel accessors
-    final rgb = primary.value & 0x00FFFFFF;
+    // Extract RGB components from ARGB representation using the modern API
+    final rgb = primary.toARGB32() & 0x00FFFFFF;
     final colorHex = '#${rgb.toRadixString(16).padLeft(6, '0')}';
 
     final options = {
@@ -90,18 +94,61 @@ class RazorpayService {
       'theme': {'color': colorHex},
     };
 
-    _razorpay!.open(options);
+    // Open checkout inside a try/catch to capture sync errors thrown by the
+    // native SDK (some SDK failures throw non-Exception objects). If open
+    // throws, convert the error into a Map so callers get a consistent shape.
+    try {
+      _razorpay!.open(options);
+    } catch (e, st) {
+      // Map some common native error types to friendly messages.
+      final typeName = e.runtimeType.toString();
+      String friendlyMessage = e.toString();
+      if (typeName.contains('NotInitialized') ||
+          typeName.contains('NoInitializer')) {
+        friendlyMessage =
+            'Razorpay native SDK not initialized. Try a full rebuild (flutter clean && flutter run) and ensure the plugin is correctly installed for your platform.';
+      } else if (typeName.contains('MissingPluginException')) {
+        friendlyMessage =
+            'Razorpay plugin is missing on the native platform. Ensure you rebuilt the app after adding the plugin.';
+      }
+      final errMap = {
+        'status': 'error',
+        'message': friendlyMessage,
+        'raw': e.toString(),
+        'type': typeName,
+        'stack': st.toString(),
+      };
+      // Ensure completer receives a failure so callers awaiting the future
+      // receive this normalized error as well.
+      if (!completer.isCompleted) completer.completeError(errMap);
+      _razorpay?.clear();
+      _razorpay = null;
+      // Also throw so callers that rely on thrown errors see something.
+      throw errMap;
+    }
 
-    // When done, detach handlers to avoid leaks
+    // When done, detach handlers to avoid leaks. Normalize any non-Map error
+    // coming out of the completer to a Map with useful details.
     try {
       final result = await completer.future;
       _razorpay?.clear();
       _razorpay = null;
       return result;
-    } catch (e) {
+    } catch (e, st) {
       _razorpay?.clear();
       _razorpay = null;
-      rethrow;
+      if (e is Map) {
+        // Already normalized by the SDK handler or above - rethrow to preserve
+        // original stack trace where possible.
+        rethrow;
+      }
+      final errMap = {
+        'status': 'error',
+        'message': e.toString(),
+        'type': e.runtimeType.toString(),
+        'stack': st.toString(),
+      };
+      throw errMap;
     }
   }
 }

@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const Order = require('../models/order');
+const Sale = require('../models/sale');
 
 const router = express.Router();
 
@@ -40,6 +41,35 @@ router.post('/', auth, async (req, res) => {
     });
     await order.save();
     console.log('[POST /api/orders] saved order id:', order._id.toString());
+
+    // create a corresponding sale record so sales are tracked separately
+    try {
+      const items = (order.items || []).map((it) => ({
+        productId: it.productId || it._id,
+        name: it.name,
+        price: it.price,
+        quantity: it.quantity || it.qty || 1,
+        lineTotal: it.lineTotal || (it.price * (it.quantity || it.qty || 1)),
+      }));
+      const subtotal = (order.pricing && order.pricing.subtotal) || items.reduce((s, i) => s + (i.lineTotal || 0), 0);
+      const total = (order.pricing && order.pricing.total) || order.pricing?.total || subtotal;
+      const tax = (order.pricing && order.pricing.tax) || 0;
+      const sale = new Sale({
+        items,
+        subtotal,
+        tax,
+        total,
+        source: 'order',
+        orderRef: order._id,
+        createdBy: req.user._id,
+      });
+      await sale.save();
+      console.log('[POST /api/orders] sale saved id:', sale._id.toString());
+    } catch (se) {
+      console.error('[POST /api/orders] failed to save sale:', se?.message || se);
+      // Do not fail the order creation because sale logging failed; just log.
+    }
+
     return res.status(201).json({ id: order._id.toString() });
   } catch (e) {
     console.error('[POST /api/orders] error name:', e?.name);

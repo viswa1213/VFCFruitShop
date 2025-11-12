@@ -14,6 +14,8 @@ import 'package:fruit_shop/models/pricing.dart';
 import 'package:fruit_shop/models/payment_info.dart';
 import 'package:fruit_shop/models/order.dart';
 import 'package:fruit_shop/widgets/app_snackbar.dart';
+import 'package:fruit_shop/utils/responsive.dart';
+import 'package:fruit_shop/widgets/animated_sections.dart';
 
 class CheckoutPage extends StatefulWidget {
   final List<Map<String, dynamic>> cartItems;
@@ -379,111 +381,140 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   @override
   Widget build(BuildContext context) {
-    final fadeTween = Tween<double>(begin: 0, end: 1);
+    final responsive = Responsive.of(context);
+    final primary = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Checkout"),
+        title: Text(
+          "Checkout",
+          style: TextStyle(
+            fontSize: responsive.fontSize(20, 22),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        flexibleSpace: Builder(
-          builder: (context) {
-            final primary = Theme.of(context).colorScheme.primary;
-            return Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [primary, Color.lerp(primary, Colors.white, 0.2)!],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            );
-          },
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [primary, Color.lerp(primary, Colors.white, 0.2)!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(responsive.isMobile ? 16 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Progress indicator
-            _buildProgress(),
-            const SizedBox(height: 16),
-            // 🛒 Order Summary
-            TweenAnimationBuilder<double>(
-              tween: fadeTween,
-              duration: const Duration(milliseconds: 420),
-              curve: Curves.easeOutCubic,
-              builder: (context, t, _) => Opacity(
-                opacity: t,
-                child: Transform.translate(
-                  offset: Offset(0, 12 * (1 - t)),
-                  child: _orderSummary(),
-                ),
-              ),
+            FadeInSlide(
+              offset: const Offset(0, -20),
+              duration: const Duration(milliseconds: 600),
+              child: _buildProgress(responsive, primary),
             ),
-
-            const SizedBox(height: 20),
-
-            // 📦 Delivery Info
-            TweenAnimationBuilder<double>(
-              tween: fadeTween,
-              duration: const Duration(milliseconds: 420),
-              curve: Curves.easeOutCubic,
-              builder: (context, t, _) => Opacity(
-                opacity: t,
-                child: Transform.translate(
-                  offset: Offset(0, 12 * (1 - t)),
-                  child: _deliveryInfo(),
-                ),
-              ),
+            SizedBox(height: responsive.spacing(20, 24)),
+            // Order Summary
+            FadeInSlide(
+              offset: const Offset(-30, 0),
+              duration: const Duration(milliseconds: 600),
+              delay: const Duration(milliseconds: 100),
+              child: _orderSummary(responsive, primary),
             ),
-
-            const SizedBox(height: 20),
-
-            // 💳 Payment Method
-            TweenAnimationBuilder<double>(
-              tween: fadeTween,
-              duration: const Duration(milliseconds: 420),
-              curve: Curves.easeOutCubic,
-              builder: (context, t, _) => Opacity(
-                opacity: t,
-                child: Transform.translate(
-                  offset: Offset(0, 12 * (1 - t)),
-                  child: _paymentSection(),
-                ),
-              ),
+            SizedBox(height: responsive.spacing(20, 24)),
+            // Delivery Info
+            FadeInSlide(
+              offset: const Offset(-30, 0),
+              duration: const Duration(milliseconds: 600),
+              delay: const Duration(milliseconds: 200),
+              child: _deliveryInfo(responsive, primary),
             ),
-
-            const SizedBox(height: 30),
-
-            // ✅ Place Order Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: placeOrder,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  "Place Order",
-                  style: TextStyle(fontSize: 18, color: Colors.white),
-                ),
-              ),
+            SizedBox(height: responsive.spacing(20, 24)),
+            // Payment Method
+            FadeInSlide(
+              offset: const Offset(-30, 0),
+              duration: const Duration(milliseconds: 600),
+              delay: const Duration(milliseconds: 300),
+              child: _paymentSection(responsive, primary),
             ),
-            const SizedBox(height: 12),
-            _totalsBar(),
+            SizedBox(height: responsive.spacing(30, 40)),
+            // Place Order Button
+            FadeInSlide(
+              offset: const Offset(0, 30),
+              duration: const Duration(milliseconds: 600),
+              delay: const Duration(milliseconds: 400),
+              child: _buildPlaceOrderButton(responsive, primary),
+            ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            FadeInSlide(
+              offset: const Offset(0, 30),
+              duration: const Duration(milliseconds: 600),
+              delay: const Duration(milliseconds: 500),
+              child: _totalsBar(responsive, primary),
+            ),
+            SizedBox(height: responsive.spacing(20, 24)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProgress() {
+  Widget _buildPlaceOrderButton(Responsive responsive, Color primary) {
+    return Material(
+      color: primary,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: placeOrder,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            vertical: responsive.isMobile ? 16 : 18,
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primary, primary.withValues(alpha: 0.8)],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: primary.withValues(alpha: 0.4),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.shopping_cart_checkout,
+                color: Colors.white,
+                size: 24,
+              ),
+              SizedBox(width: responsive.spacing(12, 16)),
+              Text(
+                "Place Order",
+                style: TextStyle(
+                  fontSize: responsive.fontSize(18, 20),
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgress(Responsive responsive, Color primary) {
     final stages = ['Cart', 'Address', 'Payment', 'Review'];
     final activeIndex =
         paymentMethod == 'Cash on Delivery' ||
@@ -519,7 +550,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Widget _orderSummary() {
+  Widget _orderSummary(Responsive responsive, Color primary) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -656,7 +687,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Widget _deliveryInfo() {
+  Widget _deliveryInfo(Responsive responsive, Color primary) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -845,7 +876,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Widget _paymentSection() {
+  Widget _paymentSection(Responsive responsive, Color primary) {
     Widget methodTile(String label, String key) {
       final selected = paymentMethod == key;
       return AnimatedContainer(
@@ -920,7 +951,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Widget _totalsBar() {
+  Widget _totalsBar(Responsive responsive, Color primary) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

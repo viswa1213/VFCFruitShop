@@ -2,9 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fruit_shop/services/auth_service.dart';
+import 'package:fruit_shop/services/image_resolver.dart';
 import 'package:fruit_shop/services/user_data_api.dart';
 import 'package:fruit_shop/pages/cart.dart';
 import 'package:fruit_shop/widgets/app_snackbar.dart';
+import 'package:fruit_shop/utils/responsive.dart';
+import 'package:fruit_shop/widgets/animated_sections.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, String> userData;
@@ -33,6 +36,7 @@ class _ProfilePageState extends State<ProfilePage>
   bool _marketingEnabled = false;
   final ImagePicker _picker = ImagePicker();
   File? _avatarFile;
+  String? _avatarUrl;
   // Recent orders from backend
   List<Map<String, dynamic>> _recentOrders = const [];
   bool _loadingRecent = false;
@@ -52,6 +56,7 @@ class _ProfilePageState extends State<ProfilePage>
     _addressController = TextEditingController(
       text: widget.userData['address'] ?? '',
     );
+    _avatarUrl = widget.userData['avatarUrl'];
 
     _favorites = int.tryParse(widget.userData['favorites'] ?? '') ?? 0;
 
@@ -101,8 +106,11 @@ class _ProfilePageState extends State<ProfilePage>
           }
         }
         final favs = (me['favorites'] as List?) ?? const [];
-        _favorites = favs.length;
-        setState(() {});
+        final avatar = me['avatarUrl']?.toString();
+        setState(() {
+          _favorites = favs.length;
+          _avatarUrl = (avatar != null && avatar.isNotEmpty) ? avatar : null;
+        });
       }
     } catch (_) {}
   }
@@ -161,7 +169,37 @@ class _ProfilePageState extends State<ProfilePage>
       );
       if (!mounted) return;
       if (ok) {
-        AppSnack.showSuccess(context, 'Profile updated');
+        widget.userData['name'] = _nameController.text.trim();
+        widget.userData['phone'] = _phoneController.text.trim();
+        String? uploadedUrl;
+        if (_avatarFile != null) {
+          try {
+            final bytes = await _avatarFile!.readAsBytes();
+            final segments = _avatarFile!.uri.pathSegments;
+            final fileName = segments.isNotEmpty ? segments.last : 'avatar.jpg';
+            uploadedUrl = await UserDataApi.uploadAvatar(
+              bytes: bytes,
+              filename: fileName,
+            );
+          } catch (e) {
+            if (!mounted) return;
+            AppSnack.showError(
+              context,
+              'Avatar upload failed: ${e.toString()}',
+            );
+          }
+        }
+        if (!mounted) return;
+        if (uploadedUrl != null) {
+          setState(() {
+            _avatarUrl = uploadedUrl;
+            _avatarFile = null;
+          });
+          widget.userData['avatarUrl'] = uploadedUrl;
+          AppSnack.showSuccess(context, 'Profile & avatar updated');
+        } else {
+          AppSnack.showSuccess(context, 'Profile updated');
+        }
         _refreshFromBackend();
       } else {
         AppSnack.showError(context, 'Failed to update profile');
@@ -170,6 +208,97 @@ class _ProfilePageState extends State<ProfilePage>
       if (!mounted) return;
       AppSnack.showError(context, 'Update failed: $e');
     }
+  }
+
+  Widget _avatarWidget(double radius) {
+    // Local file has priority (picked image)
+    if (_avatarFile != null) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.white24,
+        child: ClipOval(
+          child: Image.file(
+            _avatarFile!,
+            width: radius * 2,
+            height: radius * 2,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Center(
+              child: Text(
+                _nameController.text.isNotEmpty
+                    ? _nameController.text[0].toUpperCase()
+                    : 'G',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: radius * 0.64,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_avatarUrl != null && _avatarUrl!.isNotEmpty) {
+      // Use ResolvedImage to handle emulator/local -> base URL rewrites
+      final initials = _nameController.text.isNotEmpty
+          ? _nameController.text[0].toUpperCase()
+          : 'G';
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.white24,
+        child: ClipOval(
+          child: SizedBox(
+            width: radius * 2,
+            height: radius * 2,
+            child: ResolvedImage(
+              _avatarUrl,
+              width: radius * 2,
+              height: radius * 2,
+              fit: BoxFit.cover,
+              borderRadius: BorderRadius.circular(radius),
+              placeholder: Center(
+                child: Text(
+                  initials,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: radius * 0.64,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final initials = _nameController.text.isNotEmpty
+        ? _nameController.text[0].toUpperCase()
+        : 'G';
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.white24,
+      child: Text(
+        initials,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: radius * 0.64,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  // Avatar URL resolution moved to `ResolvedImage` widget; helper removed.
+
+  Map<String, dynamic> _buildPopResult() {
+    return {
+      'avatarUrl': _avatarUrl,
+      'name': _nameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'phone': _phoneController.text.trim(),
+    };
   }
 
   // Removed legacy favorites loader (backend hydration covers this)
@@ -274,23 +403,7 @@ class _ProfilePageState extends State<ProfilePage>
                     tag: 'profile_avatar_${widget.userData['email'] ?? name}',
                     child: Stack(
                       children: [
-                        CircleAvatar(
-                          radius: 44,
-                          backgroundColor: Colors.white24,
-                          backgroundImage: _avatarFile != null
-                              ? FileImage(_avatarFile!)
-                              : null,
-                          child: _avatarFile == null
-                              ? Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'G',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        ),
+                        _avatarWidget(44),
                         Positioned(
                           right: -2,
                           bottom: -2,
@@ -366,7 +479,7 @@ class _ProfilePageState extends State<ProfilePage>
                             onPressed: () {
                               // If we have a cart opener from Home, pop Profile then open cart with real items.
                               if (widget.openCart != null) {
-                                Navigator.pop(context); // close Profile
+                                Navigator.pop(context, _buildPopResult());
                                 widget.openCart!();
                               } else {
                                 // Fallback: open an empty cart (legacy behavior)
@@ -437,28 +550,60 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _statTile(IconData icon, String label, int value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.12)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(height: 8),
-          Text(
-            '$value',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+    return FadeInSlide(
+      offset: const Offset(0, 20),
+      duration: const Duration(milliseconds: 500),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withValues(alpha: 0.1),
+              color.withValues(alpha: 0.05),
+            ],
           ),
-          const SizedBox(height: 6),
-          Text(label, style: const TextStyle(color: Colors.black54)),
-        ],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.2), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '$value',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -587,12 +732,7 @@ class _ProfilePageState extends State<ProfilePage>
                       final img = thumbs[i];
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.asset(
-                          img,
-                          height: 44,
-                          width: 44,
-                          fit: BoxFit.cover,
-                        ),
+                        child: _orderThumb(img),
                       );
                     },
                   ),
@@ -755,263 +895,365 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
+  // Resolve order item image: treat /uploads or relative paths as network resources via API base URL.
+  Widget _orderThumb(String? path) {
+    const double size = 44;
+    if (path == null || path.isEmpty) {
+      return Container(
+        color: Colors.grey.shade200,
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.local_grocery_store_outlined,
+          color: Colors.grey,
+        ),
+      );
+    }
+    final trimmed = path.trim();
+    // If already absolute URL, load network.
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return _networkThumb(trimmed);
+    }
+    // If begins with /uploads treat as backend-hosted resource.
+    if (trimmed.startsWith('/uploads')) {
+      final base = AuthService.getBaseUrl();
+      return _networkThumb('$base$trimmed');
+    }
+    // Fallback: try asset; if it fails will display placeholder.
+    return Image.asset(
+      trimmed,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        color: Colors.grey.shade200,
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        child: const Icon(Icons.broken_image, color: Colors.grey),
+      ),
+    );
+  }
+
+  Widget _networkThumb(String url) {
+    const double size = 44;
+    return ResolvedImage(
+      url,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      borderRadius: BorderRadius.circular(6),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Account'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.primary,
-                Color.lerp(
-                  Theme.of(context).colorScheme.primary,
-                  Colors.white,
-                  0.2,
-                )!,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    final responsive = Responsive.of(context);
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        Navigator.of(context).pop(_buildPopResult());
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Account',
+            style: TextStyle(
+              fontSize: responsive.fontSize(20, 22),
+              fontWeight: FontWeight.w800,
             ),
           ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(_isEditing ? Icons.check : Icons.edit),
-            onPressed: () {
-              if (_isEditing) {
-                _saveProfile();
-              } else {
-                _toggleEdit();
-              }
-            },
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [primary, Color.lerp(primary, Colors.white, 0.2)!],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
           ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refreshFromBackend,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 14),
-            _buildStatsCard(),
-            const SizedBox(height: 14),
-            _quickActions(),
-            const SizedBox(height: 14),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Container(
-                key: ValueKey(_isEditing),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.05),
-                      Colors.white,
-                    ],
+          actions: [
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  if (_isEditing) {
+                    _saveProfile();
+                  } else {
+                    _toggleEdit();
+                  }
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    _isEditing ? Icons.check_circle : Icons.edit_rounded,
+                    color: Colors.white,
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.2),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: _refreshFromBackend,
+          color: primary,
+          child: ListView(
+            padding: EdgeInsets.all(responsive.isMobile ? 16 : 20),
+            children: [
+              _buildHeader(),
+              SizedBox(height: responsive.spacing(14, 18)),
+              _buildStatsCard(),
+              SizedBox(height: responsive.spacing(14, 18)),
+              _quickActions(),
+              SizedBox(height: responsive.spacing(14, 18)),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: Container(
+                  key: ValueKey(_isEditing),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.05),
+                        Colors.white,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
                       color: Theme.of(
                         context,
-                      ).colorScheme.primary.withValues(alpha: 0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                      ).colorScheme.primary.withValues(alpha: 0.2),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _isEditing ? 'Edit profile' : 'Profile info',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_isEditing) ...[
+                          _buildEditableField(
+                            label: 'Full name',
+                            controller: _nameController,
+                            icon: Icons.person,
+                          ),
+                          const SizedBox(height: 10),
+                          _buildEditableField(
+                            label: 'Email',
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            icon: Icons.email,
+                          ),
+                          const SizedBox(height: 10),
+                          _buildEditableField(
+                            label: 'Phone',
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            icon: Icons.phone,
+                          ),
+                          const SizedBox(height: 10),
+                          _buildEditableField(
+                            label: 'Address',
+                            controller: _addressController,
+                            maxLines: 2,
+                            icon: Icons.location_on,
+                          ),
+                        ] else ...[
+                          _displayRow(
+                            icon: Icons.person,
+                            label: 'Name',
+                            value: _nameController.text.isEmpty
+                                ? 'Not set'
+                                : _nameController.text,
+                          ),
+                          const SizedBox(height: 8),
+                          _displayRow(
+                            icon: Icons.email,
+                            label: 'Email',
+                            value: _emailController.text.isEmpty
+                                ? 'Not set'
+                                : _emailController.text,
+                          ),
+                          const SizedBox(height: 8),
+                          _displayRow(
+                            icon: Icons.phone,
+                            label: 'Mobile',
+                            value: _phoneController.text.isEmpty
+                                ? 'Not set'
+                                : _phoneController.text,
+                          ),
+                          const SizedBox(height: 8),
+                          _displayRow(
+                            icon: Icons.location_on,
+                            label: 'Address',
+                            value: _addressController.text.isEmpty
+                                ? 'Not set'
+                                : _addressController.text,
+                            multiline: true,
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        if (_isEditing)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isEditing = false;
+                                      // revert changes by resetting controllers to original userData
+                                      _nameController.text =
+                                          widget.userData['name'] ?? '';
+                                      _emailController.text =
+                                          widget.userData['email'] ?? '';
+                                      _phoneController.text =
+                                          widget.userData['phone'] ?? '';
+                                      _addressController.text =
+                                          widget.userData['address'] ?? '';
+                                    });
+                                  },
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _saveProfile,
+                                  child: const Text('Save changes'),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Preferences
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      value: _notifEnabled,
+                      onChanged: (v) => setState(() => _notifEnabled = v),
+                      title: const Text('Notifications'),
+                      subtitle: const Text('Order updates and recommendations'),
+                      secondary: const Icon(Icons.notifications_active),
+                    ),
+                    const Divider(height: 1),
+                    SwitchListTile(
+                      value: _marketingEnabled,
+                      onChanged: (v) => setState(() => _marketingEnabled = v),
+                      title: const Text('Offers & marketing'),
+                      subtitle: const Text('Get seasonal deals from VFC'),
+                      secondary: const Icon(Icons.local_offer),
                     ),
                   ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          _isEditing ? 'Edit profile' : 'Profile info',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
+              ),
+              SizedBox(height: responsive.spacing(12, 16)),
+              _buildRecentOrders(),
+              SizedBox(height: responsive.spacing(18, 24)),
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.settings),
+                  title: const Text('Account settings'),
+                  subtitle: const Text(
+                    'Manage password, payment methods and more',
+                  ),
+                  onTap: () {
+                    Navigator.pushNamed(context, '/settings');
+                  },
+                ),
+              ),
+              SizedBox(height: responsive.spacing(12, 16)),
+              StaggeredAnimation(
+                index: 5,
+                child: Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      const SizedBox(height: 12),
-                      if (_isEditing) ...[
-                        _buildEditableField(
-                          label: 'Full name',
-                          controller: _nameController,
-                          icon: Icons.person,
-                        ),
-                        const SizedBox(height: 10),
-                        _buildEditableField(
-                          label: 'Email',
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          icon: Icons.email,
-                        ),
-                        const SizedBox(height: 10),
-                        _buildEditableField(
-                          label: 'Phone',
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          icon: Icons.phone,
-                        ),
-                        const SizedBox(height: 10),
-                        _buildEditableField(
-                          label: 'Address',
-                          controller: _addressController,
-                          maxLines: 2,
-                          icon: Icons.location_on,
-                        ),
-                      ] else ...[
-                        _displayRow(
-                          icon: Icons.person,
-                          label: 'Name',
-                          value: _nameController.text.isEmpty
-                              ? 'Not set'
-                              : _nameController.text,
-                        ),
-                        const SizedBox(height: 8),
-                        _displayRow(
-                          icon: Icons.email,
-                          label: 'Email',
-                          value: _emailController.text.isEmpty
-                              ? 'Not set'
-                              : _emailController.text,
-                        ),
-                        const SizedBox(height: 8),
-                        _displayRow(
-                          icon: Icons.phone,
-                          label: 'Mobile',
-                          value: _phoneController.text.isEmpty
-                              ? 'Not set'
-                              : _phoneController.text,
-                        ),
-                        const SizedBox(height: 8),
-                        _displayRow(
-                          icon: Icons.location_on,
-                          label: 'Address',
-                          value: _addressController.text.isEmpty
-                              ? 'Not set'
-                              : _addressController.text,
-                          multiline: true,
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      if (_isEditing)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _isEditing = false;
-                                    // revert changes by resetting controllers to original userData
-                                    _nameController.text =
-                                        widget.userData['name'] ?? '';
-                                    _emailController.text =
-                                        widget.userData['email'] ?? '';
-                                    _phoneController.text =
-                                        widget.userData['phone'] ?? '';
-                                    _addressController.text =
-                                        widget.userData['address'] ?? '';
-                                  });
-                                },
-                                child: const Text('Cancel'),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: _saveProfile,
-                                child: const Text('Save changes'),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
+                      child: const Icon(Icons.help_outline, color: Colors.blue),
+                    ),
+                    title: const Text(
+                      'Help & Support',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      AppSnack.showInfo(context, 'Support not available');
+                    },
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            // Preferences
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    value: _notifEnabled,
-                    onChanged: (v) => setState(() => _notifEnabled = v),
-                    title: const Text('Notifications'),
-                    subtitle: const Text('Order updates and recommendations'),
-                    secondary: const Icon(Icons.notifications_active),
-                  ),
-                  const Divider(height: 1),
-                  SwitchListTile(
-                    value: _marketingEnabled,
-                    onChanged: (v) => setState(() => _marketingEnabled = v),
-                    title: const Text('Offers & marketing'),
-                    subtitle: const Text('Get seasonal deals from VFC'),
-                    secondary: const Icon(Icons.local_offer),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildRecentOrders(),
-            const SizedBox(height: 18),
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ListTile(
-                leading: const Icon(Icons.settings),
-                title: const Text('Account settings'),
-                subtitle: const Text(
-                  'Manage password, payment methods and more',
+              const SizedBox(height: 12),
+              Card(
+                color: Theme.of(
+                  context,
+                ).colorScheme.error.withValues(alpha: 0.08),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                onTap: () {
-                  Navigator.pushNamed(context, '/settings');
-                },
+                child: ListTile(
+                  leading: Icon(
+                    Icons.logout,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  title: Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: const Text('Sign out from this device'),
+                  onTap: _confirmLogout,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ListTile(
-                leading: const Icon(Icons.help_outline),
-                title: const Text('Help & Support'),
-                onTap: () {
-                  AppSnack.showInfo(context, 'Support not available');
-                },
-              ),
-            ),
-            const SizedBox(height: 18),
-            ElevatedButton.icon(
-              onPressed: _confirmLogout,
-              icon: const Icon(Icons.logout),
-              label: const Text('Logout'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
@@ -1031,9 +1273,9 @@ extension _ProfileVisualHelpers on _ProfilePageState {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       decoration: BoxDecoration(
-        color: primary.withOpacity(0.05),
+        color: primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: primary.withOpacity(0.18)),
+        border: Border.all(color: primary.withValues(alpha: 0.18)),
       ),
       child: Row(
         crossAxisAlignment: multiline
@@ -1052,7 +1294,7 @@ extension _ProfileVisualHelpers on _ProfilePageState {
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.6,
-                    color: primary.withOpacity(0.75),
+                    color: primary.withValues(alpha: 0.75),
                   ),
                 ),
                 const SizedBox(height: 4),

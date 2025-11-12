@@ -111,7 +111,11 @@ class UserDataApi {
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       try {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
-        return data['user'] as Map<String, dynamic>?;
+        final user = (data['user'] as Map?)?.cast<String, dynamic>();
+        if (user != null) {
+          await AuthService.syncUserCache(user);
+        }
+        return user;
       } catch (_) {
         return null;
       }
@@ -130,7 +134,67 @@ class UserDataApi {
         if (phone != null) 'phone': phone,
       }),
     );
-    return resp.statusCode >= 200 && resp.statusCode < 300;
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      try {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final user = (data['user'] as Map?)?.cast<String, dynamic>();
+        if (user != null) {
+          await AuthService.syncUserCache(user);
+        } else {
+          await AuthService.syncUserCache({
+            if (name != null) 'name': name,
+            if (phone != null) 'phone': phone,
+          });
+        }
+      } catch (_) {
+        await AuthService.syncUserCache({
+          if (name != null) 'name': name,
+          if (phone != null) 'phone': phone,
+        });
+      }
+      return true;
+    }
+    return false;
+  }
+
+  static Future<String?> uploadAvatar({
+    required List<int> bytes,
+    String filename = 'avatar.jpg',
+  }) async {
+    final uri = _uri('/api/user/avatar');
+    final request = http.MultipartRequest('POST', uri);
+    final token = await AuthService.getToken();
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    request.headers['Accept'] = 'application/json';
+    request.files.add(
+      http.MultipartFile.fromBytes('avatar', bytes, filename: filename),
+    );
+
+    final resp = await request.send();
+    final body = await resp.stream.bytesToString();
+    Map<String, dynamic>? data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } catch (_) {
+      data = null;
+    }
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final user = (data?['user'] as Map?)?.cast<String, dynamic>();
+      final avatarUrl =
+          data?['avatarUrl']?.toString() ?? user?['avatarUrl']?.toString();
+      if (user != null) {
+        await AuthService.syncUserCache(user);
+      } else if (avatarUrl != null) {
+        await AuthService.syncUserCache({'avatarUrl': avatarUrl});
+      }
+      return avatarUrl;
+    }
+
+    final message = data?['message'] ?? 'Avatar upload failed';
+    throw Exception('Avatar upload failed (${resp.statusCode}): $message');
   }
 
   // =====================
@@ -143,7 +207,28 @@ class UserDataApi {
     return resp.statusCode >= 200 && resp.statusCode < 300;
   }
 
-  static Future<List<Map<String, dynamic>>> adminListProducts({String? category}) async {
+  // SALES
+  static Future<String?> createSale(Map<String, dynamic> sale) async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.post(
+      _uri('/api/sales'),
+      headers: headers,
+      body: jsonEncode(sale),
+    );
+    if (resp.statusCode == 201) {
+      try {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return data['id']?.toString();
+      } catch (_) {
+        return null;
+      }
+    }
+    throw Exception('Failed to create sale: HTTP ${resp.statusCode}');
+  }
+
+  static Future<List<Map<String, dynamic>>> adminListProducts({
+    String? category,
+  }) async {
     final headers = await AuthService.authHeaders();
     final path = category == null
         ? '/api/admin/products'
@@ -158,7 +243,9 @@ class UserDataApi {
     throw Exception('Failed to list products: HTTP $code');
   }
 
-  static Future<Map<String, dynamic>> adminCreateProduct(Map<String, dynamic> product) async {
+  static Future<Map<String, dynamic>> adminCreateProduct(
+    Map<String, dynamic> product,
+  ) async {
     final headers = await AuthService.authHeaders();
     final resp = await http.post(
       _uri('/api/admin/products'),
@@ -172,7 +259,10 @@ class UserDataApi {
     throw Exception('Create product failed: HTTP $code ${resp.body}');
   }
 
-  static Future<Map<String, dynamic>> adminUpdateProduct(String id, Map<String, dynamic> patch) async {
+  static Future<Map<String, dynamic>> adminUpdateProduct(
+    String id,
+    Map<String, dynamic> patch,
+  ) async {
     final headers = await AuthService.authHeaders();
     final resp = await http.put(
       _uri('/api/admin/products/$id'),
@@ -186,23 +276,37 @@ class UserDataApi {
     throw Exception('Update product failed: HTTP $code ${resp.body}');
   }
 
-  static Future<Map<String, dynamic>> adminUploadProductImage(String id, List<int> bytes, {String filename = 'image.jpg'}) async {
-    final headers = await AuthService.authHeaders();
+  static Future<Map<String, dynamic>> adminUploadProductImage(
+    String id,
+    List<int> bytes, {
+    String filename = 'image.jpg',
+  }) async {
     final uri = _uri('/api/admin/products/$id/image');
     final request = http.MultipartRequest('POST', uri);
-    headers.forEach((k, v) => request.headers[k] = v);
-    request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: filename));
+    final token = await AuthService.getToken();
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    request.headers['Accept'] = 'application/json';
+    request.files.add(
+      http.MultipartFile.fromBytes('image', bytes, filename: filename),
+    );
     final streamed = await request.send();
     final respBody = await streamed.stream.bytesToString();
     if (streamed.statusCode >= 200 && streamed.statusCode < 300) {
       return jsonDecode(respBody) as Map<String, dynamic>;
     }
-    throw Exception('Image upload failed: HTTP ${streamed.statusCode} $respBody');
+    throw Exception(
+      'Image upload failed: HTTP ${streamed.statusCode} $respBody',
+    );
   }
 
   static Future<bool> adminDeleteProduct(String id) async {
     final headers = await AuthService.authHeaders();
-    final resp = await http.delete(_uri('/api/admin/products/$id'), headers: headers);
+    final resp = await http.delete(
+      _uri('/api/admin/products/$id'),
+      headers: headers,
+    );
     return resp.statusCode >= 200 && resp.statusCode < 300;
   }
 
@@ -255,9 +359,19 @@ class UserDataApi {
     final resp = await http.patch(
       _uri('/api/admin/users/$id/role'),
       headers: headers,
-      body: jsonEncode({ 'role': role }),
+      body: jsonEncode({'role': role}),
     );
     return resp.statusCode >= 200 && resp.statusCode < 300;
+  }
+
+  static Future<Map<String, dynamic>> adminSummary() async {
+    final headers = await AuthService.authHeaders();
+    final resp = await http.get(_uri('/api/admin/summary'), headers: headers);
+    final code = resp.statusCode;
+    if (code >= 200 && code < 300) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load admin summary: HTTP $code');
   }
 
   // ----------------- END ADMIN ENDPOINTS -----------------

@@ -30,13 +30,46 @@ exports.register = async (req, res) => {
     const user = new User({ name, email, password: hashedPassword, role });
     await user.save();
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error("JWT_SECRET missing. Set it in .env to secure tokens.");
+      // Provide a clear message in non-production environments
+      return res.status(500).json({
+        message: "Server config error: JWT secret missing",
+        code: "CONFIG_JWT_SECRET_MISSING",
+      });
+    }
+
+    const token = jwt.sign({ id: user._id }, secret, { expiresIn: "7d" });
 
     console.log("User registered:", user.email);
-  return res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    return res.status(201).json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        avatarUrl: user.avatarUrl,
+      },
+    });
   } catch (error) {
+    // Handle duplicate key race (should be rare due to prior check)
+    if (error && error.code === 11000) {
+      console.warn("Duplicate registration race condition for:", req.body.email);
+      return res.status(400).json({ message: "User already exists", code: "USER_EXISTS" });
+    }
+    // Mongoose validation mapping
+    if (error && error.name === 'ValidationError' && error.errors) {
+      const details = Object.fromEntries(
+        Object.entries(error.errors).map(([k, v]) => [k, v.message])
+      );
+      console.warn('Validation failed for register:', details);
+      return res.status(400).json({ message: 'Validation failed', code: 'VALIDATION_ERROR', details });
+    }
     console.error("Registration error:", error);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error", code: "REGISTER_FAILED" });
   }
 };
 
@@ -59,7 +92,15 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error("JWT_SECRET missing. Login cannot generate token.");
+      return res.status(500).json({
+        message: "Server config error: JWT secret missing",
+        code: "CONFIG_JWT_SECRET_MISSING",
+      });
+    }
+    const token = jwt.sign({ id: user._id }, secret, { expiresIn: "7d" });
 
     console.log("User logged in:", email);
     // Include role, compute from stored role (and update if env changed)
@@ -72,9 +113,19 @@ exports.login = async (req, res) => {
       user.role = 'admin';
       await user.save();
     }
-    return res.status(200).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    return res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        avatarUrl: user.avatarUrl,
+      },
+    });
   } catch (err) {
     console.error("Login error:", err);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error", code: "LOGIN_FAILED" });
   }
 };

@@ -1,8 +1,10 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+// foundation import removed: no longer need platform-specific defaults; the
+// app now defaults to the Render deployment and accepts --dart-define to
+// override the API base URL.
 import 'package:http/http.dart' as http;
+import 'package:fruit_shop/services/user_data_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Authentication API service
@@ -24,9 +26,11 @@ class AuthService {
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
 
-    final isAndroid =
-        !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
-    return isAndroid ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
+    // Default to the deployed Render backend so the app reaches your hosted
+    // API out-of-the-box. If you need to use a local backend for development
+    // set the API_BASE_URL when running, for example:
+    // flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5001
+    return 'https://vfcbackend.onrender.com';
   }
 
   static Uri _uri(String path) => Uri.parse('$_baseUrl$path');
@@ -45,6 +49,11 @@ class AuthService {
     final data = _decode(resp);
     if (resp.statusCode == 200 || resp.statusCode == 201) {
       await _persistAuth(data);
+      // Immediately hydrate full profile (may include avatarUrl and other fields)
+      // so UI shows updated user data right after registration.
+      try {
+        await UserDataApi.getMe();
+      } catch (_) {}
     }
     return data;
   }
@@ -62,6 +71,11 @@ class AuthService {
     final data = _decode(resp);
     if (resp.statusCode == 200) {
       await _persistAuth(data);
+      // After login, fetch the full user profile so fields like avatarUrl
+      // are available immediately (fixes images not appearing on first load).
+      try {
+        await UserDataApi.getMe();
+      } catch (_) {}
     }
     return data;
   }
@@ -127,6 +141,31 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kTokenKey);
     await prefs.remove(_kUserKey);
+  }
+
+  static Future<void> syncUserCache(Map<String, dynamic> update) async {
+    final prefs = await SharedPreferences.getInstance();
+    Map<String, dynamic> merged = {};
+    final raw = prefs.getString(_kUserKey);
+    if (raw != null) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          merged = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+    }
+
+    merged = {...merged, ...update};
+    final id = merged['id'];
+    if (id == null || id.toString().isEmpty) {
+      final mongoId = merged['_id'];
+      if (mongoId != null) {
+        merged['id'] = mongoId.toString();
+      }
+    }
+
+    await prefs.setString(_kUserKey, jsonEncode(merged));
   }
 
   static Future<String?> getToken() async {

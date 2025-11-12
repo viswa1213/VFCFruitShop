@@ -20,12 +20,15 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     // Top-level phone added so profile can store primary mobile separate from address.phone
-    phone: { type: String, match: [/^\d{10,15}$/u, 'Phone must be 10-15 digits'] },
+  phone: { type: String, match: [/^\d{10,15}$/u, 'Phone must be 10-15 digits'] },
+  avatarUrl: { type: String },
     // Simple role-based access control: 'user' | 'admin'
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
     cart: { type: [cartItemSchema], default: [] },
     favorites: { type: [String], default: [] },
-    address: { type: addressSchema, default: {} },
+  // Don't create an empty address object by default; this can trigger required validations.
+  // Instead, set when the user saves their address.
+  address: { type: addressSchema, default: undefined },
     settings: {
       themeMode: { type: String, enum: ['light', 'dark', 'system'], default: 'system' },
       accentColor: { type: String },

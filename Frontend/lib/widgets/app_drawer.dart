@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fruit_shop/services/app_theme.dart';
+import 'package:fruit_shop/services/auth_service.dart';
+import 'package:fruit_shop/services/image_resolver.dart';
 import 'package:fruit_shop/services/user_data_api.dart';
 
 class AppDrawer extends StatefulWidget {
@@ -28,25 +30,62 @@ class AppDrawer extends StatefulWidget {
   State<AppDrawer> createState() => _AppDrawerState();
 }
 
-class _AppDrawerState extends State<AppDrawer> {
+class _AppDrawerState extends State<AppDrawer>
+    with SingleTickerProviderStateMixin {
   Map<String, dynamic>? _me;
-  // reserved for potential loading indicator on header fetch
+  late final AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
     _loadMe();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadMe() async {
-    // no visual loader needed in drawer header; fetch quietly
     try {
       final me = await UserDataApi.getMe();
       if (!mounted) return;
       setState(() => _me = me);
     } catch (_) {
       // ignore network/auth issues; fallback to provided userData
-    } finally {}
+    }
+  }
+
+  String? _resolveAvatarUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    try {
+      final trimmed = path.trim();
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        final uri = Uri.parse(trimmed);
+        final devHosts = {'10.0.2.2', '127.0.0.1', 'localhost'};
+        if (devHosts.contains(uri.host)) {
+          final base = Uri.parse(AuthService.getBaseUrl());
+          final replaced = uri.replace(
+            scheme: base.scheme,
+            host: base.host,
+            port: base.hasPort ? base.port : null,
+          );
+          return replaced.toString();
+        }
+        return trimmed;
+      }
+      final base = AuthService.getBaseUrl();
+      if (trimmed.startsWith('/')) return '$base$trimmed';
+      return '$base/$trimmed';
+    } catch (_) {
+      return path;
+    }
   }
 
   @override
@@ -63,6 +102,9 @@ class _AppDrawerState extends State<AppDrawer> {
     final userPhone =
         (_me?['phone']?.toString() ?? address?['phone']?.toString() ?? '')
             .trim();
+    final rawAvatar = (_me?['avatarUrl'] ?? widget.userData['avatarUrl'])
+        ?.toString();
+    final avatarUrl = _resolveAvatarUrl(rawAvatar);
 
     Widget item({
       required IconData icon,
@@ -71,17 +113,19 @@ class _AppDrawerState extends State<AppDrawer> {
       Widget? trailing,
       int index = 0,
     }) {
-      return TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 360),
-        curve: Curves.easeOutCubic,
-        builder: (context, t, child) => Opacity(
-          opacity: t,
-          child: Transform.translate(
-            offset: Offset(-12 * (1 - t) * (1 + index * 0.08), 0),
-            child: child,
-          ),
-        ),
+      return AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          final delay = 0.1 * index;
+          final t = (_animationController.value - delay).clamp(0.0, 1.0);
+          return Opacity(
+            opacity: t,
+            child: Transform.translate(
+              offset: Offset(0, 20 * (1 - t)),
+              child: child,
+            ),
+          );
+        },
         child: ListTile(
           leading: Icon(icon, color: primary),
           title: Text(
@@ -113,106 +157,154 @@ class _AppDrawerState extends State<AppDrawer> {
               // Header
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 26,
-                          backgroundColor: primary,
-                          child: Text(
-                            userName.isNotEmpty
-                                ? userName[0].toUpperCase()
-                                : 'V',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                child: AnimatedBuilder(
+                  animation: _animationController,
+                  builder: (context, child) {
+                    final t = _animationController.value.clamp(0.0, 1.0);
+                    return Transform.scale(
+                      scale: 0.9 + 0.1 * t,
+                      child: Opacity(opacity: t, child: child),
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    'VFC🍎',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      color: onSurface,
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 26,
+                            backgroundColor: primary,
+                            child: avatarUrl == null
+                                ? Text(
+                                    userName.isNotEmpty
+                                        ? userName[0].toUpperCase()
+                                        : 'V',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  )
+                                : ClipOval(
+                                    child: SizedBox(
+                                      width: 52,
+                                      height: 52,
+                                      child: ResolvedImage(
+                                        avatarUrl,
+                                        width: 52,
+                                        height: 52,
+                                        fit: BoxFit.cover,
+                                        borderRadius: BorderRadius.circular(26),
+                                        placeholder: Container(
+                                          color: Colors.transparent,
+                                          child: Center(
+                                            child: Text(
+                                              userName.isNotEmpty
+                                                  ? userName[0].toUpperCase()
+                                                  : 'V',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Color.lerp(
-                                        primary,
-                                        Colors.white,
-                                        0.9,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'VFC🍎',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        color: onSurface,
                                       ),
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
                                         color: Color.lerp(
                                           primary,
                                           Colors.white,
-                                          0.6,
-                                        )!,
+                                          0.9,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                        border: Border.all(
+                                          color: Color.lerp(
+                                            primary,
+                                            Colors.white,
+                                            0.6,
+                                          )!,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Member',
+                                        style: TextStyle(
+                                          color: primary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     ),
-                                    child: Text(
-                                      'Member',
-                                      style: TextStyle(
-                                        color: primary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                userName,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: onSurface,
+                                  ],
                                 ),
-                              ),
-                              Text(
-                                userEmail,
-                                style: TextStyle(
-                                  color: onSurface.withOpacity(
-                                    isDark ? 0.9 : 0.75,
-                                  ),
-                                  fontSize: 12,
-                                ),
-                              ),
-                              if (userPhone.isNotEmpty)
+                                const SizedBox(height: 4),
                                 Text(
-                                  userPhone,
+                                  userName,
                                   style: TextStyle(
-                                    color: onSurface.withOpacity(
-                                      isDark ? 0.9 : 0.75,
+                                    fontWeight: FontWeight.w700,
+                                    color: onSurface,
+                                  ),
+                                ),
+                                Text(
+                                  userEmail,
+                                  style: TextStyle(
+                                    color: onSurface.withValues(
+                                      alpha: isDark ? 0.9 : 0.75,
                                     ),
                                     fontSize: 12,
                                   ),
                                 ),
-                            ],
+                                if (userPhone.isNotEmpty)
+                                  Text(
+                                    userPhone,
+                                    style: TextStyle(
+                                      color: onSurface.withValues(
+                                        alpha: isDark ? 0.9 : 0.75,
+                                      ),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -222,7 +314,6 @@ class _AppDrawerState extends State<AppDrawer> {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    // Use themed surface for better contrast in dark mode
                     color: Theme.of(context).colorScheme.surface,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(16),
@@ -285,9 +376,7 @@ class _AppDrawerState extends State<AppDrawer> {
                             bottom: 8,
                           ),
                           children: [
-                            // Accent colors only (theme mode controls removed)
                             const SizedBox(height: 4),
-                            // Accent colors
                             ValueListenableBuilder<Color>(
                               valueListenable: AppTheme.accent,
                               builder: (context, color, _) {
@@ -315,8 +404,7 @@ class _AppDrawerState extends State<AppDrawer> {
                                   spacing: 10,
                                   runSpacing: 10,
                                   children: options.map((c) {
-                                    final selected =
-                                        c.toARGB32() == color.toARGB32();
+                                    final selected = c == color;
                                     return GestureDetector(
                                       onTap: () => AppTheme.setAccent(c),
                                       child: AnimatedContainer(

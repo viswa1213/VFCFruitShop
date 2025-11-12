@@ -4,8 +4,10 @@ import 'package:fruit_shop/pages/home.dart';
 import 'package:fruit_shop/pages/login.dart';
 import 'package:fruit_shop/pages/admin_dashboard.dart';
 import 'package:fruit_shop/pages/register.dart';
+import 'package:fruit_shop/pages/splash_page.dart';
 import 'package:fruit_shop/services/app_theme.dart';
 import 'package:fruit_shop/pages/settings.dart';
+// Auth and user-data handled by the splash page; keep imports there.
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -114,7 +116,11 @@ class MyApp extends StatelessWidget {
               themeMode: mode,
               themeAnimationDuration: const Duration(milliseconds: 380),
               themeAnimationCurve: Curves.easeInOut,
-              home: const LoginPage(),
+              // Show a branded splash / entrance page on launch. The
+              // SplashPage handles a brief delay and then routes to Home or
+              // Login depending on stored auth token. Replace the placeholder
+              // logo in `lib/pages/splash_page.dart` when you have your asset.
+              home: const SplashPage(),
               routes: {
                 '/login': (context) => const LoginPage(),
                 '/register': (context) => const RegisterPage(),

@@ -16,7 +16,7 @@ app.use(require('./middleware/logger'));
 
 // Connect MongoDB
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
+  .then(() => console.log("✅ MongoDB atlas connected"))
   .catch(err => console.error("❌ MongoDB error:", err));
 
 // Startup config checks (non-fatal)
@@ -36,7 +36,14 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/user", require("./routes/userDataRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
+app.use("/api/products", require("./routes/productRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/sales", require("./routes/salesRoutes"));
+
+// Simple health endpoint for mobile diagnostics
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, ts: Date.now(), env: process.env.NODE_ENV || 'development' });
+});
 
 // Serve uploaded images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -48,4 +55,6 @@ app.get("/sample", (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});

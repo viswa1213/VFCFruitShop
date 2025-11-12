@@ -9,6 +9,8 @@ import 'package:fruit_shop/models/pricing.dart';
 import 'package:fruit_shop/models/payment_info.dart';
 import 'package:fruit_shop/models/address.dart';
 import 'package:fruit_shop/models/order.dart';
+import 'package:fruit_shop/utils/responsive.dart';
+import 'package:fruit_shop/widgets/animated_sections.dart';
 
 class PaymentPage extends StatefulWidget {
   final double totalAmount;
@@ -36,123 +38,413 @@ class _PaymentPageState extends State<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = Responsive.of(context);
+    final primary = Theme.of(context).colorScheme.primary;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Payment"),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: Text(
+          "Payment",
+          style: TextStyle(
+            fontSize: responsive.fontSize(20, 22),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [primary, Color.lerp(primary, Colors.white, 0.2)!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(responsive.isMobile ? 16 : 20),
         child: Column(
           children: [
-            // Total amount
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ListTile(
-                title: const Text(
-                  "Total Amount",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                trailing: Text(
-                  "₹${widget.totalAmount.toStringAsFixed(2)}",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
+            // Total amount card
+            FadeInSlide(
+              offset: const Offset(0, -20),
+              duration: const Duration(milliseconds: 600),
+              child: _buildAmountCard(responsive, primary),
             ),
-            const SizedBox(height: 20),
-
+            SizedBox(height: responsive.spacing(24, 32)),
             // Payment details
-            if (widget.paymentMethod == "UPI") ...[
-              const Text(
-                "Scan to Pay",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              Image.asset("assets/images/QR.jpeg", height: 200, width: 200),
-              const SizedBox(height: 10),
-              Text("UPI ID: ${widget.upiId ?? 'Not provided'}"),
+            FadeInSlide(
+              offset: const Offset(-30, 0),
+              duration: const Duration(milliseconds: 600),
+              delay: const Duration(milliseconds: 100),
+              child: _buildPaymentDetails(responsive, primary),
+            ),
+            SizedBox(height: responsive.spacing(32, 40)),
+            // Confirm Button
+            FadeInSlide(
+              offset: const Offset(0, 30),
+              duration: const Duration(milliseconds: 600),
+              delay: const Duration(milliseconds: 200),
+              child: _buildConfirmButton(responsive, primary),
+            ),
+            SizedBox(height: responsive.spacing(20, 24)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAmountCard(Responsive responsive, Color primary) {
+    return Container(
+      padding: EdgeInsets.all(responsive.isMobile ? 20 : 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            primary.withValues(alpha: 0.1),
+            primary.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: primary.withValues(alpha: 0.3), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: primary.withValues(alpha: 0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                "Ref No: $referenceNumber",
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                "Total Amount",
+                style: TextStyle(
+                  fontSize: responsive.fontSize(16, 18),
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ] else if (widget.paymentMethod == "Card") ...[
-              const Text(
-                "Pay with Card",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
+              SizedBox(height: responsive.spacing(8, 12)),
               Text(
-                "Card: **** **** **** ${widget.cardNumber?.substring(widget.cardNumber!.length - 4) ?? 'XXXX'}",
-                style: const TextStyle(fontSize: 16),
-              ),
-              Text(
-                "Ref No: $referenceNumber",
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ] else if (widget.paymentMethod == 'Razorpay') ...[
-              const Text(
-                "Razorpay Checkout",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              const Text("You'll be redirected to Razorpay's secure checkout."),
-              Text(
-                "Ref No: $referenceNumber",
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ] else ...[
-              const Text(
-                "Cash on Delivery",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              const Text("Pay the amount in cash when your order arrives."),
-              Text(
-                "Ref No: $referenceNumber",
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                "₹${widget.totalAmount.toStringAsFixed(2)}",
+                style: TextStyle(
+                  fontSize: responsive.fontSize(32, 36),
+                  fontWeight: FontWeight.w900,
+                  color: primary,
+                ),
               ),
             ],
+          ),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.payment, color: primary, size: 40),
+          ),
+        ],
+      ),
+    );
+  }
 
-            const Spacer(),
-
-            // Confirm Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isPaying
-                    ? null
-                    : () async {
-                        if (widget.paymentMethod == 'Razorpay') {
-                          await _payWithRazorpay();
-                          return;
-                        }
-                        if (widget.paymentMethod == "Cash on Delivery") {
-                          _showSuccessCod();
-                        } else {
-                          _showSuccess();
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  "Confirm Payment",
-                  style: TextStyle(fontSize: 18, color: Colors.white),
-                ),
+  Widget _buildPaymentDetails(Responsive responsive, Color primary) {
+    return Container(
+      padding: EdgeInsets.all(responsive.isMobile ? 20 : 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          if (widget.paymentMethod == "UPI") ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.qr_code, color: Colors.blue, size: 32),
+            ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            Text(
+              "Scan to Pay",
+              style: TextStyle(
+                fontSize: responsive.fontSize(20, 22),
+                fontWeight: FontWeight.w800,
               ),
             ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Image.asset(
+                "assets/images/QR.jpeg",
+                height: responsive.isMobile ? 200 : 250,
+                width: responsive.isMobile ? 200 : 250,
+              ),
+            ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            _buildInfoRow(
+              responsive,
+              'UPI ID',
+              widget.upiId ?? 'Not provided',
+              Icons.account_circle,
+            ),
+            SizedBox(height: responsive.spacing(8, 12)),
+            _buildInfoRow(
+              responsive,
+              'Reference',
+              referenceNumber,
+              Icons.receipt,
+            ),
+          ] else if (widget.paymentMethod == "Card") ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.purple.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.credit_card, color: Colors.purple, size: 32),
+            ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            Text(
+              "Pay with Card",
+              style: TextStyle(
+                fontSize: responsive.fontSize(20, 22),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            _buildInfoRow(
+              responsive,
+              'Card',
+              "**** **** **** ${widget.cardNumber?.substring(widget.cardNumber!.length - 4) ?? 'XXXX'}",
+              Icons.credit_card,
+            ),
+            SizedBox(height: responsive.spacing(8, 12)),
+            _buildInfoRow(
+              responsive,
+              'Reference',
+              referenceNumber,
+              Icons.receipt,
+            ),
+          ] else if (widget.paymentMethod == 'Razorpay') ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.indigo.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.security, color: Colors.indigo, size: 32),
+            ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            Text(
+              "Razorpay Checkout",
+              style: TextStyle(
+                fontSize: responsive.fontSize(20, 22),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: responsive.spacing(12, 16)),
+            Text(
+              "You'll be redirected to Razorpay's secure checkout.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: responsive.fontSize(14, 16),
+                color: Colors.grey.shade600,
+              ),
+            ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            _buildInfoRow(
+              responsive,
+              'Reference',
+              referenceNumber,
+              Icons.receipt,
+            ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.money, color: Colors.orange, size: 32),
+            ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            Text(
+              "Cash on Delivery",
+              style: TextStyle(
+                fontSize: responsive.fontSize(20, 22),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: responsive.spacing(12, 16)),
+            Text(
+              "Pay the amount in cash when your order arrives.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: responsive.fontSize(14, 16),
+                color: Colors.grey.shade600,
+              ),
+            ),
+            SizedBox(height: responsive.spacing(16, 20)),
+            _buildInfoRow(
+              responsive,
+              'Reference',
+              referenceNumber,
+              Icons.receipt,
+            ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    Responsive responsive,
+    String label,
+    String value,
+    IconData icon,
+  ) {
+    return Container(
+      padding: EdgeInsets.all(responsive.isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.grey.shade600),
+          SizedBox(width: responsive.spacing(12, 16)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: responsive.fontSize(12, 14),
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                SizedBox(height: responsive.spacing(4, 6)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: responsive.fontSize(14, 16),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfirmButton(Responsive responsive, Color primary) {
+    return Material(
+      color: primary,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: _isPaying
+            ? null
+            : () async {
+                if (widget.paymentMethod == 'Razorpay') {
+                  await _payWithRazorpay();
+                  return;
+                }
+                if (widget.paymentMethod == "Cash on Delivery") {
+                  _showSuccessCod();
+                } else {
+                  _showSuccess();
+                }
+              },
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            vertical: responsive.isMobile ? 16 : 18,
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primary, primary.withValues(alpha: 0.8)],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: primary.withValues(alpha: 0.4),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: _isPaying
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                    SizedBox(width: responsive.spacing(12, 16)),
+                    Text(
+                      "Processing...",
+                      style: TextStyle(
+                        fontSize: responsive.fontSize(16, 18),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    SizedBox(width: responsive.spacing(12, 16)),
+                    Text(
+                      "Confirm Payment",
+                      style: TextStyle(
+                        fontSize: responsive.fontSize(16, 18),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
@@ -184,19 +476,42 @@ class _PaymentPageState extends State<PaymentPage> {
     try {
       final amountPaise = (widget.totalAmount * 100).round();
       // 1) Ask backend to create an order
-      final createdOrder = await PaymentApi.createRazorpayOrder(
-        amountPaise: amountPaise,
-        receipt: referenceNumber,
-      );
+      Map<String, dynamic> createdOrder;
+      try {
+        createdOrder = await PaymentApi.createRazorpayOrder(
+          amountPaise: amountPaise,
+          receipt: referenceNumber,
+        );
+      } catch (err) {
+        // Surface backend error message if available
+        final msg = err is Exception ? err.toString() : '$err';
+        if (!mounted) return;
+        AppSnack.showError(context, 'Failed to create order: $msg');
+        return;
+      }
 
       // 2) Open Razorpay with order_id
       if (!mounted) return;
-      final result = await RazorpayService.instance.pay(
-        context: context,
-        amountPaise: amountPaise,
-        description: 'Payment $referenceNumber',
-        orderId: (createdOrder['id'] as String?),
-      );
+      Map<String, dynamic> result;
+      try {
+        result = await RazorpayService.instance.pay(
+          context: context,
+          amountPaise: amountPaise,
+          description: 'Payment $referenceNumber',
+          orderId: (createdOrder['id'] as String?),
+        );
+      } catch (err) {
+        // RazorpayService completes errors as a Map via completer.completeError
+        if (err is Map) {
+          final message = err['message']?.toString() ?? err.toString();
+          if (!mounted) return;
+          AppSnack.showError(context, 'Razorpay error: $message');
+        } else {
+          if (!mounted) return;
+          AppSnack.showError(context, 'Razorpay error: ${err.toString()}');
+        }
+        return;
+      }
       if (!mounted) return;
 
       // 3) Verify signature on backend
@@ -299,7 +614,13 @@ class _PaymentPageState extends State<PaymentPage> {
       _showSuccess();
     } catch (e) {
       if (!mounted) return;
-      AppSnack.showError(context, 'Razorpay Failed');
+      // Try to show a helpful message when possible
+      if (e is Map) {
+        final msg = e['message']?.toString() ?? e.toString();
+        AppSnack.showError(context, 'Razorpay Failed: $msg');
+      } else {
+        AppSnack.showError(context, 'Razorpay Failed: ${e.toString()}');
+      }
     } finally {
       // Ensure cleanup
       RazorpayService.instance.dispose();

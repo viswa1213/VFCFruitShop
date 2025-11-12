@@ -4,10 +4,10 @@ const mongoose = require('mongoose');
 // Keep minimal validation (all optional) to avoid rejects from partial forms; enhance later if needed.
 const addressSchema = new mongoose.Schema(
   {
-    name: { type: String, required: [true, 'Recipient name is required'] },
+    // Make formerly required fields optional so user can register before providing address details.
+    name: { type: String },
     phone: {
       type: String,
-      required: [true, 'Phone is required'],
       match: [/^\d{10,15}$/u, 'Phone must be 10-15 digits'],
     },
     address: { type: String },
@@ -16,7 +16,6 @@ const addressSchema = new mongoose.Schema(
     state: { type: String },
     pincode: {
       type: String,
-      required: [true, 'Pincode is required'],
       match: [/^\d{6}$/u, 'Pincode must be 6 digits'],
     },
     type: { type: String },

@@ -7,10 +7,15 @@ import 'package:fruit_shop/pages/profile.dart';
 import 'package:fruit_shop/pages/orders.dart';
 import 'package:fruit_shop/widgets/app_drawer.dart';
 import 'package:fruit_shop/pages/settings.dart';
+import 'package:fruit_shop/pages/advanced_about_page.dart';
 import 'package:fruit_shop/widgets/app_snackbar.dart';
 import 'package:fruit_shop/services/favorites_storage.dart';
+import 'package:fruit_shop/services/image_resolver.dart';
 import 'package:fruit_shop/services/user_data_api.dart';
+import 'package:fruit_shop/services/product_api.dart';
 import 'package:fruit_shop/services/auth_service.dart';
+import 'package:fruit_shop/widgets/animated_sections.dart';
+import 'package:fruit_shop/widgets/enhanced_ui_components.dart';
 
 class HomePage extends StatefulWidget {
   final Map<String, String> userData;
@@ -45,12 +50,16 @@ class _HomePageState extends State<HomePage>
   List<Map<String, dynamic>> juices = [];
   List<Map<String, dynamic>> softDrinks = [];
   List<Map<String, dynamic>> otherProducts = [];
-  // Featured content removed; no featured data list needed.
-  List<Map<String, dynamic>> _bestSellersData = [];
   List<Map<String, String>> _slides = [];
   // Fruit details loaded from assets/data/fruit_details.json
   Map<String, dynamic> _fruitDetails = {};
   bool _loading = true;
+
+  // Enhanced data
+  List<Map<String, dynamic>> trendingProducts = [];
+  List<Map<String, dynamic>> specialOffers = [];
+  Map<String, dynamic> stats = {};
+  final ScrollController _scrollController = ScrollController();
 
   List<Map<String, dynamic>> filteredFruits = [];
   List<Map<String, dynamic>> cart = [];
@@ -119,6 +128,7 @@ class _HomePageState extends State<HomePage>
     _controller.dispose(); // Dispose of the AnimationController
     _searchController.dispose(); // Dispose of the search controller
     _bannerController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -167,6 +177,18 @@ class _HomePageState extends State<HomePage>
     } else if (_sort == 'desc') {
       data.sort((a, b) => (b['price'] as num).compareTo(a['price'] as num));
     }
+
+    // Prioritize featured items to the left while preserving existing order within groups
+    final List<Map<String, dynamic>> featured = [];
+    final List<Map<String, dynamic>> standard = [];
+    for (final p in data) {
+      if ((p['isFeatured'] ?? false) == true) {
+        featured.add(p);
+      } else {
+        standard.add(p);
+      }
+    }
+    data = [...featured, ...standard];
 
     setState(() {
       filteredFruits = data;
@@ -266,156 +288,219 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _loadData() async {
     try {
-      final productsStr = await rootBundle.loadString(
-        'assets/data/products.json',
-      );
-      final List<dynamic> productsJson =
-          jsonDecode(productsStr) as List<dynamic>;
-      final List<Map<String, dynamic>> all = productsJson
-          .cast<Map<String, dynamic>>();
+      final products = await ProductApi.fetchProducts();
+      final slides = await _loadSlidesFromAssets();
 
-      // Index by name for quick lookups
-      final Map<String, Map<String, dynamic>> byName = {
-        for (final p in all) (p['name'] as String): p,
+      final List<Map<String, dynamic>> normalized = products
+          .map<Map<String, dynamic>>(_normalizeProduct)
+          .where((p) => (p['name'] as String).isNotEmpty)
+          .toList();
+
+      final fruitList = normalized.where((p) => p['type'] == 'fruit').toList();
+      final juiceList = normalized.where((p) => p['type'] == 'juice').toList();
+      final softDrinkList = normalized
+          .where((p) => p['type'] == 'soft_drink')
+          .toList();
+      final othersList = normalized
+          .where((p) => !{'fruit', 'juice', 'soft_drink'}.contains(p['type']))
+          .toList();
+
+      final Map<String, dynamic> details = {
+        for (final product in normalized)
+          (product['name'] as String).toLowerCase(): {
+            'description': product['description'] ?? '',
+            'benefits': product['benefits'] ?? const [],
+          },
       };
 
-      // Featured names removed as Featured section is not used.
+      // Load enhanced data
+      List<Map<String, dynamic>> trending = [];
+      List<Map<String, dynamic>> offers = [];
+      Map<String, dynamic> statsData = {};
 
-      // Best sellers names
-      List<String> bestNames = [];
       try {
-        final bestStr = await rootBundle.loadString(
-          'assets/data/best_sellers.json',
-        );
-        bestNames = (jsonDecode(bestStr) as List<dynamic>).cast<String>();
-      } catch (_) {}
-
-      // Slides (banner)
-      List<Map<String, String>> slides = [];
-      try {
-        final slidesStr = await rootBundle.loadString(
-          'assets/data/slides.json',
-        );
-        final List<dynamic> slidesJson = jsonDecode(slidesStr) as List<dynamic>;
-        slides = slidesJson
-            .map(
-              (e) => {
-                'image': (e['image'] as String?) ?? '',
-                'title': (e['title'] as String?) ?? '',
-              },
-            )
-            .toList();
-      } catch (_) {}
-      // Juices (optional)
-      List<Map<String, dynamic>> juicesList = [];
-      try {
-        final juicesStr = await rootBundle.loadString(
-          'assets/data/juices.json',
-        );
-        juicesList = (jsonDecode(juicesStr) as List<dynamic>)
-            .cast<Map<String, dynamic>>();
+        trending = await ProductApi.fetchTrending(limit: 8);
+        trending = trending.map(_normalizeProduct).toList();
       } catch (_) {}
 
-      // Soft Drinks (optional)
-      List<Map<String, dynamic>> softDrinksList = [];
       try {
-        final sdStr = await rootBundle.loadString(
-          'assets/data/soft_drinks.json',
-        );
-        softDrinksList = (jsonDecode(sdStr) as List<dynamic>)
-            .cast<Map<String, dynamic>>();
+        offers = await ProductApi.fetchOffers(limit: 6);
+        offers = offers.map(_normalizeProduct).toList();
       } catch (_) {}
 
-      // Other Products (optional)
-      List<Map<String, dynamic>> othersList = [];
       try {
-        final otStr = await rootBundle.loadString(
-          'assets/data/other_products.json',
-        );
-        othersList = (jsonDecode(otStr) as List<dynamic>)
-            .cast<Map<String, dynamic>>();
-      } catch (_) {}
-
-      // Try to load extra product details from multiple category files
-      Map<String, dynamic> details = {};
-      try {
-        final detStr = await rootBundle.loadString(
-          'assets/data/fruit_details.json',
-        );
-        final Map<String, dynamic> detJson =
-            jsonDecode(detStr) as Map<String, dynamic>;
-        // Normalize keys to lowercase for resilient lookups
-        details = {
-          for (final entry in detJson.entries)
-            entry.key.toLowerCase(): entry.value,
-        };
-      } catch (_) {}
-      // Juices details
-      try {
-        final detStr = await rootBundle.loadString(
-          'assets/data/juices_details.json',
-        );
-        final Map<String, dynamic> detJson =
-            jsonDecode(detStr) as Map<String, dynamic>;
-        details.addAll({
-          for (final entry in detJson.entries)
-            entry.key.toLowerCase(): entry.value,
-        });
-      } catch (_) {}
-      // Soft drinks details
-      try {
-        final detStr = await rootBundle.loadString(
-          'assets/data/soft_drinks_details.json',
-        );
-        final Map<String, dynamic> detJson =
-            jsonDecode(detStr) as Map<String, dynamic>;
-        details.addAll({
-          for (final entry in detJson.entries)
-            entry.key.toLowerCase(): entry.value,
-        });
-      } catch (_) {}
-      // Other products details
-      try {
-        final detStr = await rootBundle.loadString(
-          'assets/data/other_products_details.json',
-        );
-        final Map<String, dynamic> detJson =
-            jsonDecode(detStr) as Map<String, dynamic>;
-        details.addAll({
-          for (final entry in detJson.entries)
-            entry.key.toLowerCase(): entry.value,
-        });
+        statsData = await ProductApi.fetchStats();
       } catch (_) {}
 
       setState(() {
-        fruits = all;
-        juices = juicesList;
-        softDrinks = softDrinksList;
+        fruits = fruitList;
+        juices = juiceList;
+        softDrinks = softDrinkList;
         otherProducts = othersList;
-        _bestSellersData = bestNames
-            .map((n) => byName[n])
-            .whereType<Map<String, dynamic>>()
-            .toList();
-        filteredFruits = List.from([
-          ...all,
-          ...juicesList,
-          ...softDrinksList,
-          ...othersList,
-        ]);
+        filteredFruits = List<Map<String, dynamic>>.from(normalized);
         _slides = slides;
         _fruitDetails = details;
+        trendingProducts = trending;
+        specialOffers = offers;
+        stats = statsData;
         _loading = false;
       });
+
+      _applyFilters();
       if (_slides.length > 1) {
         _startBannerAutoPlay();
       }
     } catch (e) {
-      // If anything fails, keep initial state but stop loading
+      if (!mounted) return;
       setState(() {
         _loading = false;
-        filteredFruits = List.from(fruits);
       });
+      AppSnack.showError(context, 'Failed to load products');
     }
+  }
+
+  Future<List<Map<String, String>>> _loadSlidesFromAssets() async {
+    try {
+      final slidesStr = await rootBundle.loadString('assets/data/slides.json');
+      final List<dynamic> slidesJson = jsonDecode(slidesStr) as List<dynamic>;
+      return slidesJson
+          .map(
+            (e) => {
+              'image': (e['image'] as String?) ?? '',
+              'title': (e['title'] as String?) ?? '',
+            },
+          )
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Map<String, dynamic> _normalizeProduct(Map<String, dynamic> raw) {
+    final name = (raw['name'] ?? '').toString();
+    final type = (raw['category'] ?? 'other').toString().toLowerCase();
+    final price = (raw['price'] as num?)?.toDouble() ?? 0.0;
+    final unit = (raw['unit'] ?? 'kg').toString();
+    final description = (raw['description'] ?? '').toString();
+    final discount = (raw['discount'] as num?)?.toInt() ?? 0;
+    final rating = (raw['rating'] as num?)?.toDouble() ?? 4.5;
+    final sold = _asInt(raw['sold']);
+    final addedAt = raw['createdAt'] ?? raw['addedAt'] ?? '';
+    final measure = (raw['measure'] as num?)?.toDouble() ?? 1.0;
+    final image = raw['image']?.toString();
+    final benefits = (raw['benefits'] as List?)?.map((e) => e).toList();
+
+    return {
+      ...raw,
+      'id': (raw['_id'] ?? raw['id'] ?? name).toString(),
+      'name': name,
+      'type': type,
+      'category': _deriveCategoryLabel(type),
+      'price': price,
+      'unit': unit,
+      'measure': measure,
+      'description': description,
+      if (benefits != null) 'benefits': benefits,
+      'discount': discount,
+      'rating': rating,
+      'sold': sold,
+      'addedAt': addedAt.toString(),
+      'image': image,
+    };
+  }
+
+  String _deriveCategoryLabel(String type) {
+    switch (type) {
+      case 'fruit':
+        return 'Fruits';
+      case 'juice':
+        return 'Juices';
+      case 'soft_drink':
+        return 'Soft Drinks';
+      case 'other':
+        return 'Other Products';
+      case 'berry':
+      case 'berries':
+        return 'Fruits';
+      default:
+        if (type.isEmpty) return 'Products';
+        return type[0].toUpperCase() + type.substring(1);
+    }
+  }
+
+  int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  // _resolveProductImage no longer needed; handled by ResolvedImage
+
+  // Small featured badge used in product cards
+  Widget _featuredBadgeMini() {
+    final theme = Theme.of(context);
+    return Semantics(
+      label: 'Featured product',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.secondary.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: theme.colorScheme.secondary.withValues(alpha: 0.35),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.secondary.withValues(alpha: 0.18),
+              blurRadius: 8,
+              spreadRadius: 0.5,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.star_rate_rounded,
+              size: 14,
+              color: theme.colorScheme.secondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Featured',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductImage(String? src, {BoxFit fit = BoxFit.contain}) {
+    return ResolvedImage(
+      src,
+      fit: fit,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+      placeholder: Container(
+        color: Colors.grey.shade200,
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.local_grocery_store_outlined,
+          color: Colors.grey,
+        ),
+      ),
+      error: Container(
+        color: Colors.grey.shade300,
+        alignment: Alignment.center,
+        child: const Icon(Icons.broken_image, color: Colors.grey),
+      ),
+    );
   }
 
   void _startBannerAutoPlay() {
@@ -843,11 +928,43 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  void _applyProfileResult(dynamic result) {
+    if (!mounted) return;
+    if (result is Map) {
+      final avatar = result['avatarUrl'];
+      if (avatar != null) {
+        final avatarStr = avatar.toString().trim();
+        if (avatarStr.isNotEmpty) {
+          widget.userData['avatarUrl'] = avatarStr;
+        }
+      }
+      final name = result['name'];
+      if (name != null) {
+        final nameStr = name.toString().trim();
+        if (nameStr.isNotEmpty) {
+          widget.userData['name'] = nameStr;
+        }
+      }
+      final email = result['email'];
+      if (email != null) {
+        final emailStr = email.toString().trim();
+        if (emailStr.isNotEmpty) {
+          widget.userData['email'] = emailStr;
+        }
+      }
+      if (result.containsKey('phone')) {
+        final phoneStr = (result['phone'] ?? '').toString();
+        widget.userData['phone'] = phoneStr;
+      }
+    }
+    setState(() {});
+  }
+
   // Drawer moved to a reusable widget: AppDrawer
 
   Widget _buildBannerCarousel() {
     return SizedBox(
-      height: 160,
+      height: 220,
       child: Column(
         children: [
           Expanded(
@@ -977,7 +1094,7 @@ class _HomePageState extends State<HomePage>
     return ListView(
       children: [
         const SizedBox(height: 12),
-        box(h: 160, m: const EdgeInsets.symmetric(horizontal: 12)),
+        box(h: 220, m: const EdgeInsets.symmetric(horizontal: 12)),
         const SizedBox(height: 12),
         box(h: 20, m: const EdgeInsets.symmetric(horizontal: 14)),
         const SizedBox(height: 8),
@@ -1014,155 +1131,389 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _aboutVfcSection() {
-    // Entrance animation for the footer card (fade + slight slide + animated border)
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 550),
-      curve: Curves.easeOutCubic,
-      builder: (context, t, child) {
-        final beginAlign = Alignment(-0.6 + 0.2 * (1 - t), 0);
-        final endAlign = Alignment(0.6 - 0.2 * (1 - t), 0);
-        return Opacity(
-          opacity: t,
-          child: Transform.translate(
-            offset: Offset(0, 12 * (1 - t)),
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
+    return FadeInSlide(
+      offset: const Offset(0, 30),
+      duration: const Duration(milliseconds: 800),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: beginAlign,
-                    end: endAlign,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
                     colors: [
-                      Theme.of(context).colorScheme.primary,
-                      Color.lerp(
-                        Theme.of(context).colorScheme.primary,
-                        Colors.white,
-                        0.25,
-                      )!,
+                primary,
+                primary.withValues(alpha: 0.8),
+                primary.withValues(alpha: 0.6),
                     ],
+              stops: const [0.0, 0.5, 1.0],
                   ),
-                  borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: primary.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+                spreadRadius: 2,
+              ),
+            ],
                 ),
                 child: Container(
-                  margin: const EdgeInsets.all(
-                    2.0,
-                  ), // gradient border thickness
+            margin: const EdgeInsets.all(3.0),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(21),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                  // Header with animated logo
+                  _buildAnimatedHeader(primary),
+                  const SizedBox(height: 16),
+                  // Description with fade-in
+                  _buildAnimatedDescription(),
+                  const SizedBox(height: 20),
+                  // Features grid with staggered animation
+                  _buildFeaturesGrid(),
+                  const SizedBox(height: 20),
+                  // Divider with animation
+                  _buildAnimatedDivider(primary),
+                  const SizedBox(height: 16),
+                  // Footer with CTA
+                  _buildAnimatedFooter(primary),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedHeader(Color primary) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.elasticOut,
+      builder: (context, value, child) {
+        // Clamp value to [0.0, 1.0] because elastic curves can overshoot
+        final clampedValue = value.clamp(0.0, 1.0);
+        return Transform.scale(
+          scale: 0.8 + (0.2 * clampedValue),
+          child: Opacity(
+            opacity: clampedValue,
+            child: Row(
                           children: [
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primary,
-                              child: const Text(
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [primary, primary.withValues(alpha: 0.7)],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: primary.withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
                                 'VFC',
-                                style: TextStyle(
+                      style: const TextStyle(
                                   color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        letterSpacing: 1,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                             Text(
                               'About VFC',
                               style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Theme.of(context).colorScheme.primary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: primary,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        width: 60,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [primary, primary.withValues(alpha: 0.3)],
+                          ),
+                          borderRadius: BorderRadius.circular(2),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnimatedDescription() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 10 * (1 - value)),
+            child: Text(
                           'VFC brings you farm-fresh fruits with uncompromising quality. We partner directly with trusted growers so you enjoy peak-season taste, transparent sourcing, and fair prices.',
-                          style: TextStyle(height: 1.35),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: const [
-                            _AboutRow(
-                              icon: Icons.eco,
-                              text: 'Picked at peak freshness',
-                            ),
-                            _AboutRow(
-                              icon: Icons.local_shipping,
-                              text: 'Fast, careful delivery',
-                            ),
-                            _AboutRow(
-                              icon: Icons.handshake,
-                              text: 'Direct from growers',
-                            ),
-                            _AboutRow(
-                              icon: Icons.verified,
-                              text: 'Quality checked',
+              style: TextStyle(
+                height: 1.5,
+                fontSize: 14,
+                color: Colors.grey.shade700,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFeaturesGrid() {
+    final features = [
+      (Icons.eco, 'Picked at peak freshness', Colors.green),
+      (Icons.local_shipping, 'Fast, careful delivery', Colors.blue),
+      (Icons.handshake, 'Direct from growers', Colors.orange),
+      (Icons.verified, 'Quality checked', Colors.purple),
+    ];
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: features.asMap().entries.map((entry) {
+        final index = entry.key;
+        final (icon, text, color) = entry.value;
+        return StaggeredAnimation(
+          index: index,
+          duration: const Duration(milliseconds: 600),
+          child: _buildFeatureCard(icon, text, color),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildFeatureCard(IconData icon, String text, Color color) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {},
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                color.withValues(alpha: 0.1),
+                color.withValues(alpha: 0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.2), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        const Divider(height: 1),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Expanded(
-                              child: Text(
-                                'From everyday staples to seasonal favorites, VFC is your go-to for better fruit—delivered.',
-                                style: TextStyle(color: Colors.black54),
-                              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 20),
                             ),
                             const SizedBox(width: 12),
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                _clearAllFilters();
-                                AppSnack.showInfo(
-                                  context,
-                                  'Filters cleared. Explore all fruits',
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.local_grocery_store,
-                                size: 18,
-                              ),
-                              label: const Text('Explore All'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary,
-                                side: BorderSide(
-                                  color: Color.lerp(
-                                    Theme.of(context).colorScheme.primary,
-                                    Colors.white,
-                                    0.4,
-                                  )!,
-                                ),
+              Flexible(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Colors.grey.shade800,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedDivider(Color primary) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Container(
+          height: 2,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                primary.withValues(alpha: value * 0.3),
+                primary.withValues(alpha: value * 0.1),
+                Colors.transparent,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(1),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnimatedFooter(Color primary) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 10 * (1 - value)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'From everyday staples to seasonal favorites, VFC is your go-to for better fruit—delivered.',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                _buildAnimatedCTAButton(primary),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnimatedCTAButton(Color primary) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.elasticOut,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.7 + (0.3 * value),
+          child: Material(
+            color: primary,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AdvancedAboutPage()),
+                );
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
+                  horizontal: 20,
+                  vertical: 14,
                                 ),
-                                textStyle: const TextStyle(
-                                  fontWeight: FontWeight.w700,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [primary, primary.withValues(alpha: 0.8)],
                                 ),
-                              ),
-                            ),
-                          ],
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primary.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
                         ),
                       ],
                     ),
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Explore All',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 600),
+                      curve: Curves.elasticOut,
+                      builder: (context, animValue, child) {
+                        // Clamp value to [0.0, 1.0] because elastic curves can overshoot
+                        final clampedAnimValue = animValue.clamp(0.0, 1.0);
+                        return Transform.translate(
+                          offset: Offset(5 * (1 - clampedAnimValue), 0),
+                          child: Opacity(
+                            opacity: clampedAnimValue,
+                            child: const Icon(
+                              Icons.arrow_forward_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1174,11 +1525,16 @@ class _HomePageState extends State<HomePage>
 
   void _openProductSheet(Map<String, dynamic> fruit) {
     final name = fruit['name'] as String;
-    final price = (fruit['price'] as num).toDouble();
+    final price = (fruit['price'] as num?)?.toDouble() ?? 0;
     final discount = (fruit['discount'] as num?)?.toInt() ?? 0;
-    final original = discount > 0
-        ? (price / (1 - (discount / 100))).round()
+    final double? originalValue = discount > 0
+        ? price / (1 - (discount / 100))
         : null;
+    final original = originalValue == null
+        ? null
+        : (originalValue.truncateToDouble() == originalValue
+              ? originalValue.toInt()
+              : originalValue.round());
     final lowerName = name.toLowerCase();
     final Map<String, dynamic>? det =
         _fruitDetails[lowerName] as Map<String, dynamic>?;
@@ -1226,7 +1582,7 @@ class _HomePageState extends State<HomePage>
                   tag: 'img-$name',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(fruit['image'], fit: BoxFit.cover),
+                    child: _buildProductImage(fruit['image']?.toString()),
                   ),
                 ),
               ),
@@ -1332,38 +1688,6 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  // Featured section removed; featured items getter no longer needed.
-  List<Map<String, dynamic>> get _bestSellers {
-    if (_bestSellersData.isNotEmpty) return _bestSellersData;
-    final list = List<Map<String, dynamic>>.from(fruits);
-    list.sort((a, b) => (b['sold'] as int).compareTo(a['sold'] as int));
-    return list.take(10).toList();
-  }
-
-  List<Map<String, dynamic>> get _newArrivals {
-    final list = List<Map<String, dynamic>>.from(fruits);
-    DateTime parseDate(String s) {
-      try {
-        return DateTime.parse(s);
-      } catch (_) {
-        return DateTime.fromMillisecondsSinceEpoch(0);
-      }
-    }
-
-    list.sort(
-      (a, b) => parseDate(
-        b['addedAt']?.toString() ?? '',
-      ).compareTo(parseDate(a['addedAt']?.toString() ?? '')),
-    );
-    return list.take(10).toList();
-  }
-
-  List<Map<String, dynamic>> get _topRated {
-    final list = List<Map<String, dynamic>>.from(fruits);
-    list.sort((a, b) => (b['rating'] as num).compareTo(a['rating'] as num));
-    return list.take(10).toList();
-  }
-
   Widget _sectionHeader(String title) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6),
     child: Row(
@@ -1379,18 +1703,37 @@ class _HomePageState extends State<HomePage>
 
   Widget _horizontalProducts(List<Map<String, dynamic>> items) {
     if (items.isEmpty) return const SizedBox.shrink();
+    // Order featured products first without mutating the source list
+    final List<Map<String, dynamic>> ordered = () {
+      final f = <Map<String, dynamic>>[];
+      final s = <Map<String, dynamic>>[];
+      for (final p in items) {
+        if ((p['isFeatured'] ?? false) == true) {
+          f.add(p);
+        } else {
+          s.add(p);
+        }
+      }
+      return [...f, ...s];
+    }();
     return SizedBox(
       height: 210,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         scrollDirection: Axis.horizontal,
-        itemCount: items.length,
+        itemCount: ordered.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
-          final fruit = items[index];
+          final theme = Theme.of(context);
+          final fruit = ordered[index];
           final name = fruit['name'] as String;
           final keyId = 'h:$name';
           final isFav = favorites.contains(name);
+          final discount = (fruit['discount'] as num?)?.toInt() ?? 0;
+          final priceValue = (fruit['price'] as num?)?.toDouble() ?? 0;
+          final priceLabel = priceValue.truncateToDouble() == priceValue
+              ? priceValue.toInt().toString()
+              : priceValue.toStringAsFixed(2);
           return MouseRegion(
             onEnter: (_) => setState(() => _hovered.add(keyId)),
             onExit: (_) => setState(() => _hovered.remove(keyId)),
@@ -1400,9 +1743,17 @@ class _HomePageState extends State<HomePage>
               child: SizedBox(
                 width: 160,
                 child: Card(
-                  elevation: 3,
+                  elevation: (fruit['isFeatured'] ?? false) == true ? 5 : 3,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
+                    side: (fruit['isFeatured'] ?? false) == true
+                        ? BorderSide(
+                            color: theme.colorScheme.secondary.withValues(
+                              alpha: 0.35,
+                            ),
+                            width: 1.2,
+                          )
+                        : BorderSide.none,
                   ),
                   child: InkWell(
                     onTap: () => _openProductSheet(fruit),
@@ -1418,14 +1769,18 @@ class _HomePageState extends State<HomePage>
                                   borderRadius: const BorderRadius.vertical(
                                     top: Radius.circular(14),
                                   ),
-                                  child: Image.asset(
-                                    fruit['image'],
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
+                                  child: _buildProductImage(
+                                    fruit['image']?.toString(),
                                   ),
                                 ),
                               ),
-                              if ((fruit['discount'] as int) > 0)
+                              if ((fruit['isFeatured'] ?? false) == true)
+                                Positioned(
+                                  right: 8,
+                                  bottom: 8,
+                                  child: _featuredBadgeMini(),
+                                ),
+                              if (discount > 0)
                                 Positioned(
                                   left: 8,
                                   top: 8,
@@ -1439,7 +1794,7 @@ class _HomePageState extends State<HomePage>
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
-                                      '-${fruit['discount']}%',
+                                      '-$discount%',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 12,
@@ -1518,7 +1873,7 @@ class _HomePageState extends State<HomePage>
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    '₹${fruit['price']}',
+                                    '₹$priceLabel',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -1557,116 +1912,239 @@ class _HomePageState extends State<HomePage>
     bool shrinkWrap = false,
     ScrollPhysics? physics,
   }) {
+    // Prioritize featured items to appear on the left/top positions.
+    final ordered = () {
+      final f = <Map<String, dynamic>>[];
+      final s = <Map<String, dynamic>>[];
+      for (final p in data) {
+        if ((p['isFeatured'] ?? false) == true) {
+          f.add(p);
+        } else {
+          s.add(p);
+        }
+      }
+      return [...f, ...s];
+    }();
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: GridView.builder(
         shrinkWrap: shrinkWrap,
         physics: physics,
-        itemCount: data.length,
+        itemCount: ordered.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
           crossAxisSpacing: 15,
           mainAxisSpacing: 15,
-          childAspectRatio: 0.75,
+          childAspectRatio: 0.72,
         ),
         itemBuilder: (context, index) {
-          final fruit = data[index];
+          return StaggeredAnimation(
+            index: index,
+            duration: const Duration(milliseconds: 500),
+            child: _buildEnhancedProductCard(ordered[index], index),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEnhancedProductCard(Map<String, dynamic> fruit, int index) {
+          final theme = Theme.of(context);
           final name = fruit['name'] as String;
           final isFav = favorites.contains(name);
           final discount = (fruit['discount'] as num?)?.toInt() ?? 0;
-          final price = (fruit['price'] as num).toDouble();
-          final original = discount > 0
-              ? (price / (1 - (discount / 100))).round()
+          final price = (fruit['price'] as num?)?.toDouble() ?? 0;
+    final rating = (fruit['rating'] as num?)?.toDouble() ?? 0.0;
+    final sold = (fruit['sold'] as num?)?.toInt() ?? 0;
+    final stock = (fruit['stock'] as num?)?.toInt() ?? 0;
+    final isFeatured = (fruit['isFeatured'] ?? false) == true;
+    final isHovered = _hovered.contains('grid-$name');
+    final isPressed = _pressed.contains('grid-$name');
+
+          final priceLabel = price.truncateToDouble() == price
+              ? price.toInt().toString()
+              : price.toStringAsFixed(2);
+          final double? originalValue = discount > 0
+              ? price / (1 - (discount / 100))
               : null;
+          final String? originalLabel = originalValue == null
+              ? null
+              : (originalValue.truncateToDouble() == originalValue
+                    ? originalValue.toInt().toString()
+                    : originalValue.toStringAsFixed(2));
 
           return MouseRegion(
-            onEnter: (_) => setState(() => _hovered.add(name)),
-            onExit: (_) => setState(() => _hovered.remove(name)),
+      onEnter: (_) => setState(() => _hovered.add('grid-$name')),
+      onExit: (_) => setState(() => _hovered.remove('grid-$name')),
             child: GestureDetector(
-              onTapDown: (_) => setState(() => _pressed.add(name)),
-              onTapUp: (_) => setState(() => _pressed.remove(name)),
-              onTapCancel: () => setState(() => _pressed.remove(name)),
+        onTapDown: (_) => setState(() => _pressed.add('grid-$name')),
+        onTapUp: (_) => setState(() => _pressed.remove('grid-$name')),
+        onTapCancel: () => setState(() => _pressed.remove('grid-$name')),
               onTap: () => _openProductSheet(fruit),
               child: AnimatedScale(
-                duration: const Duration(milliseconds: 120),
-                scale: (_hovered.contains(name) || _pressed.contains(name))
-                    ? 1.03
-                    : 1.0,
-                child: Stack(
-                  children: [
-                    Card(
-                      elevation:
-                          (_hovered.contains(name) || _pressed.contains(name))
-                          ? 10
-                          : 6,
+          scale: isHovered || isPressed ? 1.02 : 1.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          child: Transform.translate(
+            offset: Offset(0.0, isHovered || isPressed ? -4.0 : 0.0),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: isFeatured
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          theme.colorScheme.primary.withValues(alpha: 0.05),
+                          theme.colorScheme.secondary.withValues(alpha: 0.02),
+                        ],
+                      )
+                    : null,
+                boxShadow: [
+                  BoxShadow(
+                    color: isFeatured
+                        ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                        : Colors.black.withValues(alpha: 0.08),
+                    blurRadius: isHovered || isPressed ? 20 : 12,
+                    offset: Offset(0, isHovered || isPressed ? 8 : 4),
+                    spreadRadius: isHovered || isPressed ? 2 : 0,
+                  ),
+                ],
+              ),
+              child: Card(
+                elevation: 0,
+                margin: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
+                  side: isFeatured
+                            ? BorderSide(
+                                color: theme.colorScheme.secondary.withValues(
+                            alpha: 0.5,
+                                ),
+                          width: 1.5,
+                              )
+                      : BorderSide(
+                          color: Colors.grey.withValues(alpha: 0.1),
+                          width: 1,
+                        ),
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                    // Image Section
                           Expanded(
+                      flex: 3,
                             child: Stack(
+                        fit: StackFit.expand,
                               children: [
-                                Positioned.fill(
-                                  child: Hero(
+                          // Product Image
+                          Hero(
                                     tag: 'img-$name',
-                                    child: Image.asset(
-                                      fruit['image'],
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              const Center(
-                                                child: Icon(
-                                                  Icons.broken_image,
-                                                  size: 40,
-                                                  color: Colors.red,
-                                                ),
-                                              ),
+                                    child: _buildProductImage(
+                                      fruit['image']?.toString(),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          // Gradient Overlay
+                          if (isHovered || isPressed)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.15),
+                                    ],
+                                  ),
                                     ),
                                   ),
                                 ),
+                          // Discount Badge
                                 if (discount > 0)
                                   Positioned(
-                                    left: 10,
-                                    top: 10,
+                              top: 12,
+                              left: 12,
+                              child: PulseAnimation(
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
+                                    horizontal: 10,
+                                    vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.redAccent,
-                                        borderRadius: BorderRadius.circular(8),
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFFE91E63),
+                                        Color(0xFFF06292),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.pink.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
                                       ),
-                                      child: Text(
-                                        '-$discount%',
+                                    ],
+                                      ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.local_offer,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$discount% OFF',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 12,
                                         ),
                                       ),
+                                    ],
                                     ),
                                   ),
+                              ),
+                            ),
+                          // Favorite Button
                                 Positioned(
-                                  right: 10,
-                                  top: 10,
+                            top: 12,
+                            right: 12,
+                            child: Material(
+                              color: Colors.transparent,
                                   child: InkWell(
                                     onTap: () => toggleFavorite(fruit),
-                                    child: CircleAvatar(
-                                      radius: 18,
-                                      backgroundColor: Colors.white,
-                                      child: AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 180,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.1,
                                         ),
-                                        transitionBuilder: (c, anim) =>
-                                            ScaleTransition(
-                                              scale: anim,
-                                              child: c,
-                                            ),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                      child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 200),
+                                    transitionBuilder: (child, animation) {
+                                      return ScaleTransition(
+                                        scale: animation,
+                                        child: child,
+                                      );
+                                    },
                                         child: Icon(
                                           isFav
                                               ? Icons.favorite
@@ -1674,128 +2152,811 @@ class _HomePageState extends State<HomePage>
                                           key: ValueKey<bool>(isFav),
                                           color: isFav
                                               ? Colors.pink
-                                              : Colors.grey,
+                                          : Colors.grey.shade600,
+                                      size: 20,
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
+                          ),
+                          // Featured Badge
+                          if (isFeatured)
+                                  Positioned(
+                              bottom: 12,
+                              right: 12,
+                                    child: _featuredBadgeMini(),
+                                  ),
+                          // Stock Indicator
+                          if (stock > 0 && stock < 10)
+                            Positioned(
+                              bottom: 12,
+                              left: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withValues(alpha: 0.9),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Only $stock left',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
                               ],
                             ),
                           ),
-                          Padding(
+                    // Product Info Section
+                    Expanded(
+                      flex: 2,
+                      child: Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
+                          horizontal: 12,
                               vertical: 10,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                               children: [
+                            // Product Name
                                 Text(
                                   name,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 16,
+                              style: TextStyle(
+                                fontSize: 14,
                                     fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.onSurface,
+                                letterSpacing: -0.3,
+                                height: 1.2,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Row(
+                            // Rating and Category Row
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade50,
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      Icons.star,
-                                      size: 14,
-                                      color: Colors.amber.shade600,
+                                          Icons.star_rounded,
+                                          size: 12,
+                                          color: Colors.amber.shade700,
                                     ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      ((fruit['rating'] as num?)?.toDouble() ??
-                                              0)
-                                          .toStringAsFixed(1),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.black54,
+                                        const SizedBox(width: 2),
+                                        Flexible(
+                                          child: Text(
+                                            rating.toStringAsFixed(1),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.amber.shade900,
                                       ),
+                                            overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Container(
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (sold > 0) ...[
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
+                                        horizontal: 5,
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary
+                                        color: Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Text(
+                                        '$sold sold',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.green.shade700,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                const Spacer(),
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary
                                             .withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(6),
+                                      borderRadius: BorderRadius.circular(5),
                                       ),
                                       child: Text(
                                         fruit['category']?.toString() ?? '',
                                         style: TextStyle(
-                                          fontSize: 11,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.primary,
+                                        fontSize: 9,
+                                        color: theme.colorScheme.primary,
                                           fontWeight: FontWeight.w600,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                            const Spacer(),
+                            // Price and Add Button Row
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Flexible(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Row(
+                                        mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(
-                                          '₹${price.round()}',
-                                          style: const TextStyle(
+                                          Flexible(
+                                            child: Text(
+                                          '₹$priceLabel',
+                                              style: TextStyle(
                                             fontWeight: FontWeight.w800,
+                                                fontSize: 16,
+                                                color:
+                                                    theme.colorScheme.primary,
+                                                height: 1.1,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (originalLabel != null) ...[
+                                            const SizedBox(width: 4),
+                                            Flexible(
+                                              child: Text(
+                                                '₹$originalLabel',
+                                                style: TextStyle(
+                                                  decoration: TextDecoration
+                                                      .lineThrough,
+                                                  color: Colors.grey.shade500,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                  height: 1.1,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      if (fruit['unit'] != null)
+                                        Text(
+                                          '/${fruit['unit']}',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: Colors.grey.shade600,
+                                            height: 1.0,
+                                          ),
+                                        ),
+                                    ],
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        if (original != null)
-                                          Text(
-                                            '₹$original',
-                                            style: const TextStyle(
-                                              decoration:
-                                                  TextDecoration.lineThrough,
-                                              color: Colors.black38,
-                                              fontSize: 12,
-                                            ),
+                                Material(
+                                  color: theme.colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: InkWell(
+                                    onTap: () => _showWeightSelector(fruit),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: theme.colorScheme.primary
+                                                .withValues(alpha: 0.3),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 3),
                                           ),
-                                      ],
-                                    ),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.add_circle,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
+                                        ],
                                       ),
-                                      onPressed: () =>
-                                          _showWeightSelector(fruit),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
+                                      child: const Icon(
+                                        Icons.add_shopping_cart_rounded,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
                                     ),
-                                  ],
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return FadeInSlide(
+      offset: const Offset(0, 20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            EnhancedSectionHeader(
+              title: 'Quick Actions',
+              subtitle: 'Fast access to your favorites',
+              icon: Icons.flash_on,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildAnimatedActionButton(
+                    icon: Icons.local_offer,
+                    label: 'Offers',
+                    color: Colors.red,
+                    onTap: () {
+                      if (_scrollController.hasClients) {
+                        _scrollController.animateTo(
+                          _scrollController.position.maxScrollExtent * 0.25,
+                          duration: const Duration(milliseconds: 600),
+                          curve: Curves.easeOutCubic,
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildAnimatedActionButton(
+                    icon: Icons.trending_up,
+                    label: 'Trending',
+                    color: Colors.orange,
+                    onTap: () {
+                      if (_scrollController.hasClients) {
+                        _scrollController.animateTo(
+                          _scrollController.position.maxScrollExtent * 0.35,
+                          duration: const Duration(milliseconds: 600),
+                          curve: Curves.easeOutCubic,
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildAnimatedActionButton(
+                    icon: Icons.favorite,
+                    label: 'Favorites',
+                    color: Colors.pink,
+                    onTap: () {
+                      setState(() => _selectedIndex = 2);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildAnimatedActionButton(
+                    icon: Icons.shopping_cart,
+                    label: 'Cart',
+                    color: Colors.blue,
+                    onTap: _openCart,
+                    badge: cart.length,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+    int? badge,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: Duration(milliseconds: 300 + (label.length * 50)),
+        curve: Curves.elasticOut,
+        builder: (context, value, child) {
+          // Clamp value to [0.0, 1.0] because elastic curves can overshoot
+          final clampedValue = value.clamp(0.0, 1.0);
+          return Transform.scale(
+            scale: 0.8 + (0.2 * clampedValue),
+            child: Opacity(
+              opacity: clampedValue,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 8,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [color, color.withValues(alpha: 0.8)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: Offset(0, 6 * clampedValue),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(icon, color: Colors.white, size: 24),
+                        if (badge != null && badge > 0)
+                          Positioned(
+                            right: -8,
+                            top: -8,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                badge > 9 ? '9+' : '$badge',
+                                style: TextStyle(
+                                  color: color,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                                          Text(
+                      label,
+                                            style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            ),
+                      textAlign: TextAlign.center,
+                                          ),
+                                      ],
+                                    ),
+              ),
+            ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSpecialOffersSection() {
+    return FadeInSlide(
+      offset: const Offset(0, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          EnhancedSectionHeader(
+            title: 'Special Offers',
+            subtitle: 'Limited time deals - Don\'t miss out!',
+            icon: Icons.local_offer,
+            action: TextButton.icon(
+              onPressed: () {
+                // Show all offers
+                _applyFilters();
+              },
+              icon: const Icon(Icons.arrow_forward, size: 16),
+              label: const Text('View All'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 260,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: specialOffers.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (context, index) {
+                return StaggeredAnimation(
+                  index: index,
+                  duration: const Duration(milliseconds: 600),
+                  child: _buildOfferCard(specialOffers[index], index),
+                );
+              },
+            ),
+                                    ),
+                                  ],
+                                ),
+    );
+  }
+
+  Widget _buildOfferCard(Map<String, dynamic> product, int index) {
+    final discount = (product['discount'] as num?)?.toInt() ?? 0;
+    final price = (product['price'] as num?)?.toDouble() ?? 0.0;
+    final originalPrice = discount > 0 ? price / (1 - (discount / 100)) : null;
+    final isHovered = _hovered.contains('offer-$index');
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered.add('offer-$index')),
+      onExit: (_) => setState(() => _hovered.remove('offer-$index')),
+      child: GestureDetector(
+        onTap: () => _openProductSheet(product),
+        child: AnimatedScale(
+          scale: isHovered ? 1.05 : 1.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            width: 200,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.red.shade50,
+                  Colors.orange.shade50,
+                  if (isHovered) Colors.pink.shade50,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Colors.red.withValues(alpha: isHovered ? 0.4 : 0.2),
+                width: isHovered ? 2 : 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.red.withValues(alpha: isHovered ? 0.25 : 0.15),
+                  blurRadius: isHovered ? 20 : 15,
+                  offset: Offset(0, isHovered ? 12 : 8),
+                          ),
+                        ],
+                      ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(24),
+                      ),
+                      child: SizedBox(
+                        height: 140,
+                        width: double.infinity,
+                        child: _buildProductImage(
+                          product['image']?.toString(),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: PulseAnimation(
+                        child: OfferBadge(discount: discount),
+                      ),
+                    ),
+                    if (isHovered)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.1),
+                              ],
+                            ),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(24),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product['name'] ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Text(
+                            '₹${price.toInt()}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: Colors.red,
+                            ),
+                          ),
+                          if (originalPrice != null) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '₹${originalPrice.toInt()}',
+                              style: TextStyle(
+                                decoration: TextDecoration.lineThrough,
+                                color: Colors.grey.shade600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+                ),
+              ),
+            ),
+          );
+  }
+
+  Widget _buildTrendingSection() {
+    return FadeInSlide(
+      offset: const Offset(0, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          EnhancedSectionHeader(
+            title: 'Trending Now',
+            subtitle: 'Most popular products this week',
+            icon: Icons.trending_up,
+            action: TextButton.icon(
+              onPressed: () {
+                // Show all trending
+                _applyFilters();
+              },
+              icon: const Icon(Icons.arrow_forward, size: 16),
+              label: const Text('View All'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 240,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: trendingProducts.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (context, index) {
+                return StaggeredAnimation(
+                  index: index,
+                  duration: const Duration(milliseconds: 600),
+                  child: _buildTrendingCard(trendingProducts[index], index),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrendingCard(Map<String, dynamic> product, int index) {
+    final sold = (product['sold'] as num?)?.toInt() ?? 0;
+    final rating = (product['rating'] as num?)?.toDouble() ?? 0.0;
+    final isHovered = _hovered.contains('trending-$index');
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered.add('trending-$index')),
+      onExit: (_) => setState(() => _hovered.remove('trending-$index')),
+      child: GestureDetector(
+        onTap: () => _openProductSheet(product),
+        child: AnimatedScale(
+          scale: isHovered ? 1.05 : 1.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            width: 190,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isHovered
+                    ? [Colors.white, Colors.orange.shade50]
+                    : [Colors.white, Colors.white],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.orange.withValues(alpha: isHovered ? 0.4 : 0.2),
+                width: isHovered ? 2 : 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: isHovered ? 0.2 : 0.1),
+                  blurRadius: isHovered ? 16 : 12,
+                  offset: Offset(0, isHovered ? 8 : 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                      child: SizedBox(
+                        height: 120,
+                        width: double.infinity,
+                        child: _buildProductImage(
+                          product['image']?.toString(),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: PulseAnimation(child: const TrendingBadge()),
+                    ),
+                    if (isHovered)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.orange.withValues(alpha: 0.1),
+                              ],
+                            ),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product['name'] ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  size: 12,
+                                  color: Colors.amber.shade700,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  rating.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '$sold sold',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '₹${(product['price'] as num?)?.toInt() ?? 0}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1808,29 +2969,76 @@ class _HomePageState extends State<HomePage>
       }
       return RefreshIndicator(
         onRefresh: () async {
-          await Future.delayed(const Duration(milliseconds: 500));
+          await _loadData();
           if (mounted) setState(() {});
         },
         child: ListView(
+          controller: _scrollController,
           children: [
-            Padding(
+            FadeInSlide(
+              offset: const Offset(0, -20),
+              child: Padding(
               padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
               child: TextField(
                 controller: _searchController,
                 onChanged: _filterFruits,
                 decoration: InputDecoration(
                   hintText: 'Search products...',
-                  prefixIcon: const Icon(Icons.search),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                   filled: true,
-                  fillColor: Colors.grey.shade200,
+                      fillColor: Colors.white,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
             _buildBannerCarousel(),
+            const SizedBox(height: 20),
+            // Quick Actions
+            _buildQuickActions(),
+            const SizedBox(height: 16),
+            // Special Offers Section
+            if (specialOffers.isNotEmpty) _buildSpecialOffersSection(),
+            const SizedBox(height: 16),
+            // Trending Products Section
+            if (trendingProducts.isNotEmpty) _buildTrendingSection(),
             const SizedBox(height: 8),
             // Top Categories removed as requested
             if (_allCategories.isNotEmpty)
@@ -1872,33 +3080,12 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             const SizedBox(height: 8),
-            if (juices.isNotEmpty) ...[
-              _sectionHeader('Fresh Juices'),
-              _horizontalProducts(juices),
-              const SizedBox(height: 8),
-            ],
-            if (softDrinks.isNotEmpty) ...[
-              _sectionHeader('Soft Drinks'),
-              _horizontalProducts(softDrinks),
-              const SizedBox(height: 8),
-            ],
-            if (otherProducts.isNotEmpty) ...[
-              _sectionHeader('Other Products'),
-              _horizontalProducts(otherProducts),
-              const SizedBox(height: 8),
-            ],
-            const SizedBox(height: 8),
-            // Featured section removed as requested
-            _sectionHeader('Best Sellers'),
-            _horizontalProducts(_bestSellers),
-            const SizedBox(height: 8),
-            _sectionHeader('New Arrivals'),
-            _horizontalProducts(_newArrivals),
-            const SizedBox(height: 8),
-            _sectionHeader('Top Rated'),
-            _horizontalProducts(_topRated),
-            const SizedBox(height: 8),
-            _sectionHeader('All Products'),
+            // All Products Section
+            EnhancedSectionHeader(
+              title: 'All Products',
+              subtitle: 'Browse our complete catalog',
+              icon: Icons.store,
+            ),
             if (filteredFruits.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -1938,7 +3125,8 @@ class _HomePageState extends State<HomePage>
             const Divider(height: 1),
             const SizedBox(height: 12),
             _aboutVfcSection(),
-            const SizedBox(height: 24),
+            // Bottom padding to prevent overflow and account for bottom navigation
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
           ],
         ),
       );
@@ -1998,16 +3186,7 @@ class _HomePageState extends State<HomePage>
 
       return ListView(
         children: [
-          if (favJuices.isNotEmpty) ...[
-            _sectionHeader('Fresh Juices'),
-            _horizontalProducts(favJuices),
-            const SizedBox(height: 8),
-          ],
-          if (favSoft.isNotEmpty) ...[
-            _sectionHeader('Soft Drinks'),
-            _horizontalProducts(favSoft),
-            const SizedBox(height: 8),
-          ],
+          // Removed Fresh Juices and Soft Drinks favorites sections
           if (favOthers.isNotEmpty) ...[
             _sectionHeader('Other Products'),
             _horizontalProducts(favOthers),
@@ -2041,15 +3220,16 @@ class _HomePageState extends State<HomePage>
           Navigator.pop(context);
           setState(() => _selectedIndex = 2);
         },
-        onOpenProfile: () {
+        onOpenProfile: () async {
           Navigator.pop(context);
-          Navigator.push(
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) =>
                   ProfilePage(userData: widget.userData, openCart: _openCart),
             ),
           );
+          _applyProfileResult(result);
         },
         onOpenSettings: () {
           Navigator.pop(context);
@@ -2059,7 +3239,7 @@ class _HomePageState extends State<HomePage>
           );
         },
         onLogout: () async {
-          if (!mounted) return;
+          if (!mounted || !context.mounted) return;
           Navigator.pop(context); // Close drawer immediately for UX
           // Final cart sync (no debounce) to persist latest state
           final payload = cart
@@ -2087,7 +3267,7 @@ class _HomePageState extends State<HomePage>
             await FavoritesStorage.clear();
           } catch (_) {}
           await AuthService.logout();
-          if (!mounted) return;
+          if (!mounted || !context.mounted) return;
           Navigator.pushReplacementNamed(context, '/login');
         },
       ),
@@ -2128,15 +3308,16 @@ class _HomePageState extends State<HomePage>
       body: _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (index) {
+        onTap: (index) async {
           if (index == 3) {
-            Navigator.push(
+            final result = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) =>
                     ProfilePage(userData: widget.userData, openCart: _openCart),
               ),
             );
+            _applyProfileResult(result);
             return;
           }
           setState(() => _selectedIndex = index);
@@ -2154,25 +3335,6 @@ class _HomePageState extends State<HomePage>
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
-    );
-  }
-}
-
-class _AboutRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _AboutRow({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: primary),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text)),
-      ],
     );
   }
 }

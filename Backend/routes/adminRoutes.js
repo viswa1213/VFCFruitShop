@@ -6,22 +6,56 @@ const Order = require('../models/order');
 const User = require('../models/user');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+// Optional S3 support; require lazily below so server can start without the SDK installed
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', 'uploads'));
+    const uploadDir = path.join(__dirname, '..', 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     cb(null, `prod_${Date.now()}${ext}`);
   }
 });
-const upload = multer({ storage });
+// S3 support if configured (will require SDK lazily)
+const useS3 = Boolean(process.env.AWS_S3_BUCKET && process.env.AWS_REGION);
+const upload = multer({ storage: useS3 ? multer.memoryStorage() : storage });
+
+let s3Client = null;
+let S3ClientClass, PutObjectCommandClass, DeleteObjectCommandClass;
+if (useS3) {
+  try {
+    ({ S3Client: S3ClientClass, PutObjectCommand: PutObjectCommandClass, DeleteObjectCommand: DeleteObjectCommandClass } = require('@aws-sdk/client-s3'));
+    s3Client = new S3ClientClass({ region: process.env.AWS_REGION });
+  } catch (err) {
+    console.warn('AWS S3 SDK not installed or failed to load; falling back to disk uploads.');
+    s3Client = null;
+  }
+}
 
 const router = express.Router();
 
 // Admin health
 router.get('/ping', auth, isAdmin, (req, res) => res.json({ ok: true }));
+
+// Dashboard summary counts
+router.get('/summary', auth, isAdmin, async (req, res) => {
+  const [productCount, orderCount, activeUserCount] = await Promise.all([
+    Product.countDocuments({}),
+    Order.countDocuments({}),
+    User.countDocuments({ active: true }),
+  ]);
+  res.json({
+    products: productCount,
+    orders: orderCount,
+    activeUsers: activeUserCount,
+  });
+});
 
 // PRODUCTS CRUD
 router.get('/products', auth, isAdmin, async (req, res) => {
@@ -50,9 +84,54 @@ router.post('/products/:id/image', auth, isAdmin, upload.single('image'), async 
     const id = req.params.id;
     const p = await Product.findById(id);
     if (!p) return res.status(404).json({ message: 'Product not found' });
-    p.image = `/uploads/${req.file.filename}`;
+
+    const previous = p.image;
+
+    if (useS3 && req.file.buffer) {
+      const ext = path.extname(req.file.originalname) || '';
+      const key = `products/prod_${Date.now()}${ext}`;
+      const bucket = process.env.AWS_S3_BUCKET;
+      const put = new PutObjectCommandClass({
+        Bucket: bucket,
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype || 'application/octet-stream',
+        ACL: process.env.AWS_S3_ACL || 'public-read',
+      });
+      await s3Client.send(put);
+
+      let publicUrl = process.env.S3_BASE_URL;
+      if (!publicUrl) publicUrl = `https://${bucket}.s3.${process.env.AWS_S3_REGION || process.env.AWS_REGION}.amazonaws.com`;
+      p.image = `${publicUrl}/${key}`;
+      await p.save();
+
+      // delete previous from S3 if applicable
+      if (previous && typeof previous === 'string') {
+        try {
+          if (previous.includes(bucket) || (process.env.S3_BASE_URL && previous.startsWith(process.env.S3_BASE_URL))) {
+            const parsed = new URL(previous);
+            const prevKey = parsed.pathname.replace(/^\//, '');
+            const del = new DeleteObjectCommandClass({ Bucket: bucket, Key: prevKey });
+            await s3Client.send(del);
+          }
+        } catch (err) {}
+      }
+
+      return res.json({ product: p });
+    }
+
+    // fallback to disk storage
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    p.image = `${baseUrl}/uploads/${req.file.filename}`;
     await p.save();
-    res.json({ product: p });
+
+    // remove previous local file if present
+    if (previous && typeof previous === 'string' && previous.startsWith('/uploads')) {
+      const previousPath = path.join(__dirname, '..', previous.replace(/^\//, ''));
+      fs.unlink(previousPath, () => {});
+    }
+
+    return res.json({ product: p });
   } catch (e) {
     res.status(400).json({ message: 'Image upload failed', error: e?.message });
   }
