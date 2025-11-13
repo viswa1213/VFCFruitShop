@@ -101,6 +101,12 @@ class _SplashPageState extends State<SplashPage>
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final onPrimary = theme.colorScheme.onPrimary;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Make logo size responsive based on screen width
+    final logoOuterSize = (screenWidth * 0.5).clamp(180.0, 240.0);
+    final logoMiddleSize = logoOuterSize * 0.917; // 220/240 ratio
+    final logoInnerSize = logoOuterSize * 0.75; // 180/240 ratio
 
     // Slightly stronger branding on dark mode so the logo container stands out.
     final containerAlpha = theme.brightness == Brightness.dark ? 0.14 : 0.06;
@@ -127,8 +133,8 @@ class _SplashPageState extends State<SplashPage>
                 ScaleTransition(
                   scale: _scaleAnim,
                   child: Container(
-                    width: 240,
-                    height: 240,
+                    width: logoOuterSize,
+                    height: logoOuterSize,
                     // Outer ring with a subtle radial gradient to act as a decorative ring.
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
@@ -143,8 +149,8 @@ class _SplashPageState extends State<SplashPage>
                     ),
                     alignment: Alignment.center,
                     child: Container(
-                      width: 220,
-                      height: 220,
+                      width: logoMiddleSize,
+                      height: logoMiddleSize,
                       decoration: BoxDecoration(
                         color: containerColor,
                         shape: BoxShape.circle,
@@ -163,17 +169,17 @@ class _SplashPageState extends State<SplashPage>
                       alignment: Alignment.center,
                       child: ClipOval(
                         child: SizedBox(
-                          width: 180,
-                          height: 180,
+                          width: logoInnerSize,
+                          height: logoInnerSize,
                           child: Image.asset(
                             'assets/images/VFC_logo1.png',
-                            width: 180,
-                            height: 180,
+                            width: logoInnerSize,
+                            height: logoInnerSize,
                             fit: BoxFit.cover,
                             errorBuilder: (ctx, err, stack) {
                               // Fallback to FlutterLogo if the asset is missing or fails to load.
                               return FlutterLogo(
-                                size: 160,
+                                size: logoInnerSize * 0.889, // 160/180 ratio
                                 style: FlutterLogoStyle.markOnly,
                                 textColor: onPrimary,
                               );
