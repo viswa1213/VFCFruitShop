@@ -573,10 +573,10 @@ class _CartPageState extends State<CartPage> {
   }
 }
 
-Widget _imagePlaceholder() {
+Widget _imagePlaceholder(double size) {
   return Container(
-    width: 55,
-    height: 55,
+    width: size,
+    height: size,
     color: Colors.grey.shade200,
     alignment: Alignment.center,
     child: const Icon(Icons.local_grocery_store, color: Colors.grey),
@@ -585,14 +585,15 @@ Widget _imagePlaceholder() {
 
 Widget _buildProductImage(Map<String, dynamic> fruit) {
   final raw = fruit['image'] ?? fruit['imageUrl'];
+  // Use a fixed reasonable size for cart items as they're within a constrained container
   const double size = 55;
   if (raw == null) {
-    return _imagePlaceholder();
+    return _imagePlaceholder(size);
   }
 
   final path = raw.toString().trim();
   if (path.isEmpty) {
-    return _imagePlaceholder();
+    return _imagePlaceholder(size);
   }
 
   final normalized = path.replaceAll('\\', '/');
@@ -611,7 +612,7 @@ Widget _buildProductImage(Map<String, dynamic> fruit) {
       width: size,
       height: size,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _imagePlaceholder(),
+      errorBuilder: (_, __, ___) => _imagePlaceholder(size),
     );
   }
 

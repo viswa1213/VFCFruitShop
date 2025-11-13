@@ -295,16 +295,7 @@ class OrderDetailsPage extends StatelessWidget {
                             child: const Icon(Icons.shopping_bag),
                           ),
                   ),
-                  Text(
-                    name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: responsive.fontSize(14, 16),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(width: responsive.spacing(16, 20)),
+                  SizedBox(width: responsive.spacing(12, 16)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
