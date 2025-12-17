@@ -30,12 +30,22 @@ class _RetryingCachedImage extends StatefulWidget {
 
 class _RetryingCachedImageState extends State<_RetryingCachedImage> {
   late String _currentUrl;
-  int _attempt = 0;
+  late final List<String> _attemptUrls;
+  int _attemptIndex = 0;
+  bool _retryScheduled = false;
+  // Maximum number of fallback attempts (not counting the initial try).
+  static const int _maxFallbacks = 2; // try original + up to 2 alternates
 
   @override
   void initState() {
     super.initState();
-    _currentUrl = widget.url;
+    // Build the list of candidate URLs once to keep retry behavior stable.
+    final alternatives = _buildAlternatives(widget.url);
+    _attemptUrls = [widget.url, ...alternatives];
+    if (_attemptUrls.length > _maxFallbacks + 1) {
+      _attemptUrls = _attemptUrls.sublist(0, _maxFallbacks + 1);
+    }
+    _currentUrl = _attemptUrls[_attemptIndex];
     if (kDebugMode) {
       debugPrint('ResolvedImage: initial URL: ${widget.url}');
     }
@@ -72,21 +82,32 @@ class _RetryingCachedImageState extends State<_RetryingCachedImage> {
 
   void _onError(Object? error, StackTrace? stack) {
     if (!mounted) return;
-    final alternatives = _buildAlternatives(widget.url);
-    if (_attempt < alternatives.length) {
-      // Schedule the state change to run after the current build frame so we
-      // don't call setState synchronously during widget building (which
-      // causes the "setState() or markNeedsBuild() called during build"
-      // exception).
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    // If there are more candidate URLs, schedule a retry with exponential
+    // backoff. Prevent duplicate scheduling while a retry is pending.
+    if (_attemptIndex < _attemptUrls.length - 1 && !_retryScheduled) {
+      _retryScheduled = true;
+      final nextIndex = _attemptIndex + 1;
+      // exponential backoff base (ms)
+      final baseDelay = 200;
+      final backoff = baseDelay * (1 << _attemptIndex);
+      final delay = Duration(milliseconds: backoff.clamp(200, 1600));
+
+      if (kDebugMode) {
+        debugPrint(
+        'ResolvedImage: scheduling retry #$nextIndex in ${delay.inMilliseconds}ms -> ${_attemptUrls[nextIndex]}');
+      }
+
+      Future.delayed(delay, () {
         if (!mounted) return;
-        setState(() {
-          _currentUrl = alternatives[_attempt];
-          _attempt += 1;
+        // Use addPostFrameCallback to avoid setState during build.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _attemptIndex = nextIndex;
+            _currentUrl = _attemptUrls[_attemptIndex];
+            _retryScheduled = false;
+          });
         });
-        if (kDebugMode) {
-          debugPrint('Retrying image with alternative: $_currentUrl');
-        }
       });
     }
   }
@@ -111,14 +132,17 @@ class _RetryingCachedImageState extends State<_RetryingCachedImage> {
       errorWidget: (_, __, error) {
         // Log the error and attempt a retry if available; if no more retries,
         // show the configured errorWidget.
+        // Only log the error in debug; schedule a retry if candidates remain.
         if (kDebugMode) {
           debugPrint('ResolvedImage: failed to load $_currentUrl');
           debugPrint('ResolvedImage: error: $error');
         }
         _onError(error, null);
-        // If we've started a retry, return the placeholder while the retry loads.
-        final alternatives = _buildAlternatives(widget.url);
-        if (_attempt <= alternatives.length) {
+
+        // If a retry is scheduled or remaining attempts exist, show placeholder
+        // while waiting. When final attempt fails, show the configured error
+        // widget (or a default broken-image icon).
+        if (_attemptIndex < _attemptUrls.length - 1 || _retryScheduled) {
           return widget.placeholder ??
               (SizedBox(
                 width: widget.width,
@@ -127,6 +151,11 @@ class _RetryingCachedImageState extends State<_RetryingCachedImage> {
                   child: CircularProgressIndicator(strokeWidth: 2.2),
                 ),
               ));
+        }
+
+        // Final failure: reduce log noise by only emitting a single message.
+        if (kDebugMode) {
+          debugPrint('ResolvedImage: all retries exhausted for ${widget.url}');
         }
         return widget.errorWidget ??
             SizedBox(
